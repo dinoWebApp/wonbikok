@@ -1,0 +1,56 @@
+<div class="space-y-4">
+  <h1 class="text-xl font-bold">
+    <%= t("invoices.edit.title", name: @invoice.student_name_snapshot, month: @invoice.target_month) %>
+  </h1>
+
+  <% if @needs_change_reason %>
+    <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+      <%= t("invoices.edit.change_reason_notice") %>
+    </div>
+  <% end %>
+
+  <%= form_with model: @invoice, url: invoice_path(@invoice), method: :patch, class: "space-y-4" do |f| %>
+    <% if @invoice.errors.any? %>
+      <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <ul class="list-disc pl-4">
+          <% @invoice.errors.full_messages.each do |m| %><li><%= m %></li><% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div class="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+      <div>
+        <p class="text-sm text-slate-500"><%= t("invoices.edit.base_amount") %></p>
+        <p class="font-semibold"><%= number_with_delimiter(@invoice.base_amount) %><%= t("invoices.won") %></p>
+      </div>
+      <div>
+        <%= f.label :adjustment_amount, t("invoices.edit.adjustment_amount"), class: "text-sm font-semibold" %>
+        <%= f.number_field :adjustment_amount, class: "mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" %>
+      </div>
+      <div>
+        <%= f.label :adjustment_note, t("invoices.edit.adjustment_note"), class: "text-sm font-semibold" %>
+        <%= f.text_field :adjustment_note, class: "mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" %>
+      </div>
+      <% if @needs_change_reason %>
+        <%# INV-002: 확정 후 수정은 변경 사유 필수 %>
+        <div>
+          <%= f.label :change_reason, t("invoices.edit.change_reason"), class: "text-sm font-semibold" %>
+          <%= f.text_field :change_reason, required: true, class: "mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" %>
+        </div>
+      <% end %>
+      <%= f.submit t("common.save"), class: "min-h-11 w-full rounded-lg bg-slate-900 text-white text-sm font-semibold" %>
+    </div>
+  <% end %>
+
+  <% if @invoice.change_history_entries.any? %>
+    <div class="rounded-xl border border-slate-200 bg-white p-5">
+      <p class="font-semibold text-sm"><%= t("invoices.edit.history") %></p>
+      <ul class="mt-2 space-y-2 text-sm text-slate-600">
+        <% @invoice.change_history_entries.each do |entry| %>
+          <li><%= entry["at"]&.to_datetime&.strftime("%Y-%m-%d %H:%M") %> · <%= entry["reason"] %> ·
+            <%= entry["adjustment_amount"] %><%= t("invoices.won") %><%= " · #{entry["adjustment_note"]}" if entry["adjustment_note"].present? %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+</div>

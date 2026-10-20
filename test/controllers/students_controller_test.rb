@@ -227,6 +227,8 @@ class StudentsControllerTest < ActionDispatch::IntegrationTest
   # TEN-001: 새 세션(타 브라우저·타 계정)으로는 오류내역 키가 조회되지 않는다
   test "타 테넌트 세션으로 오류내역 키에 접근할 수 없다" do
     with_memory_cache do
+      # 온보딩 게이트(W1 후속) 대상 회피 — 본 테스트는 TEN-001 캐시 키 격리 검증이 목적
+      @other_tenant.update!(onboarding_step: Tenant::ONBOARDING_FINAL_STEP)
       post import_students_path, params: { file: csv_upload(<<~CSV) }
         이름,학년,월 원비,납부일,납부유형,상태,보호자명,보호자 휴대폰번호
         정다은,초1,180000,15,계좌이체,재원,정어머님,01055556666

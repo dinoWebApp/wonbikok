@@ -1,5 +1,7 @@
 class RegistrationsController < ApplicationController
   skip_before_action :require_authentication, only: %i[new create]
+  # 가입 자체는 온보딩 이전 단계 — 게이트 제외(W1 후속)
+  skip_before_action :ensure_onboarding_complete
 
   def new
     @user = User.new

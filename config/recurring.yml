@@ -1,15 +1,15 @@
-# examples:
-#   periodic_cleanup:
-#     class: CleanSoftDeletedRecordsJob
-#     queue: background
-#     args: [ 1000, { batch_size: 500 } ]
-#     schedule: every hour
-#   periodic_cleanup_with_command:
-#     command: "SoftDeletedRecord.due.delete_all"
-#     priority: 2
-#     schedule: at 5am every day
-
+# Solid Queue recurring jobs (원비콕 W2 배치).
+# MSG-006: 리마인더 발송은 오전 9~10시, 야간 발송 금지 → reminder_dispatch 09:00 고정.
 production:
+  monthly_invoice_generation:
+    class: MonthlyInvoiceGenerationJob
+    queue: default
+    schedule: "0 7 1 * *"
+  reminder_dispatch:
+    class: ReminderDispatchJob
+    queue: default
+    schedule: "0 9 * * *"
+
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12

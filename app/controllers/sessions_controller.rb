@@ -1,5 +1,7 @@
 class SessionsController < ApplicationController
   skip_before_action :require_authentication, only: %i[new create]
+  # 로그인·로그아웃은 온보딩 게이트 대상 아님(미완료 테넌트도 로그인/로그아웃 가능해야 함)
+  skip_before_action :ensure_onboarding_complete
 
   # 로그인 온라인 대입 완화(WARNING-4): Rails 8 내장 rate limit
   rate_limit to: 10, within: 3.minutes, only: :create
@@ -23,6 +25,11 @@ class SessionsController < ApplicationController
   end
 
   def destroy
+    # W1 후속: 로그아웃 시 세션에 남은 CSV 오류내역 캐시 키·참조 제거(서버 캐시 잔존 방지)
+    if (csv_key = session[:csv_import_errors_key]).present?
+      Rails.cache.delete(csv_key)
+      session.delete(:csv_import_errors_key)
+    end
     clear_session
     redirect_to new_session_path, status: :see_other, notice: t("auth.signed_out")
   end

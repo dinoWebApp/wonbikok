@@ -1,6 +1,8 @@
 class Student < ApplicationRecord
   belongs_to :tenant
   has_many :guardians, dependent: :destroy
+  has_many :invoices, dependent: :destroy
+  has_many :message_logs, dependent: :destroy
 
   # 대표 보호자 1명 동시 입력(MVP 화면 기준). 복수 보호자 확장은 데이터 모델로 가능.
   accepts_nested_attributes_for :guardians

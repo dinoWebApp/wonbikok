@@ -1,0 +1,98 @@
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold"><%= t("invoices.title", month: @month) %></h1>
+    <div class="flex gap-2">
+      <%= link_to t("invoices.prev_month"), invoices_path(month: prev_month(@month)),
+            class: "min-h-11 px-3 inline-flex items-center rounded-lg border border-slate-300 bg-white text-sm" %>
+      <%= link_to t("invoices.next_month"), invoices_path(month: next_month(@month)),
+            class: "min-h-11 px-3 inline-flex items-center rounded-lg border border-slate-300 bg-white text-sm" %>
+    </div>
+  </div>
+
+  <%# 이번 달 청구 만들기 (수동 트리거 — 배치와 동일 Generator, 멱등/INV-001) %>
+  <div class="rounded-xl border border-slate-200 bg-white p-5">
+    <p class="font-semibold"><%= t("invoices.create.title") %></p>
+    <p class="mt-1 text-sm text-slate-500"><%= t("invoices.create.description") %></p>
+    <%= button_to t("invoices.create.submit"), invoices_path(target_month: @month),
+          class: "mt-3 min-h-11 px-4 inline-flex items-center rounded-lg bg-slate-900 text-white text-sm font-semibold" %>
+  </div>
+
+  <%# 미리보기 요약 (INV-006) %>
+  <div class="rounded-xl border border-slate-200 bg-white p-5">
+    <p class="font-semibold"><%= t("invoices.summary.title") %></p>
+    <dl class="mt-3 grid grid-cols-2 gap-2 text-sm">
+      <div><dt class="text-slate-500"><%= t("invoices.summary.count") %></dt><dd class="font-semibold"><%= @summary[:count] %> <%= t("invoices.summary.people") %></dd></div>
+      <div><dt class="text-slate-500"><%= t("invoices.summary.total") %></dt><dd class="font-semibold"><%= number_with_delimiter(@summary[:total_amount]) %><%= t("invoices.won") %></dd></div>
+      <div><dt class="text-slate-500"><%= Invoice.human_attribute_name(:status) %></dt>
+        <dd class="font-semibold"><%= t("invoices.status.DRAFT") %> <%= @summary[:draft_count] %> · <%= t("invoices.status.READY") %> <%= @summary[:ready_count] %> · <%= t("invoices.status.SENT") %> <%= @summary[:sent_count] %> · <%= t("invoices.status.CANCELLED") %> <%= @summary[:cancelled_count] %></dd></div>
+    </dl>
+
+    <% if @summary[:draft_count].positive? %>
+      <p class="mt-3 text-sm text-slate-500"><%= t("invoices.summary.pending_students", count: @pending_students.size) %></p>
+      <%= button_to t("invoices.confirm"), confirm_invoices_path(month: @month),
+            method: :patch,
+            data: { turbo_confirm: t("invoices.confirm_confirm") },
+            class: "mt-3 min-h-11 px-4 inline-flex items-center rounded-lg bg-emerald-600 text-white text-sm font-semibold" %>
+    <% end %>
+
+    <% if @summary[:ready_count].positive? %>
+      <%# 발송 (즉시/예약 — MSG-007) %>
+      <%= form_with url: send_batch_invoices_path(month: @month), method: :post, class: "mt-4 space-y-3" do %>
+        <fieldset class="space-y-2">
+          <legend class="text-sm font-semibold"><%= t("invoices.send.select") %></legend>
+          <% current_tenant.invoices.for_month(@month).READY.find_each do |invoice| %>
+            <label class="flex items-center gap-2 text-sm">
+              <%= check_box_tag "invoice_ids[]", invoice.id, true %>
+              <%= invoice.student_name_snapshot %> · <%= number_with_delimiter(invoice.total_amount) %><%= t("invoices.won") %>
+              · <%= t("invoices.due", date: invoice.due_on&.strftime("%-m/%-d")) %>
+            </label>
+          <% end %>
+        </fieldset>
+        <label class="flex items-center gap-2 text-sm">
+          <%= check_box_tag :scheduled, "1", false %>
+          <%= t("invoices.send.scheduled") %>
+          <%= datetime_local_field_tag :send_at, nil, class: "rounded-lg border border-slate-300 px-3 py-2" %>
+        </label>
+        <%= submit_tag t("invoices.send.submit"),
+              data: { turbo_confirm: t("invoices.send.confirm") },
+              class: "min-h-11 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold" %>
+      <% end %>
+    <% end %>
+  </div>
+
+  <%# 원생별 청구 목록 %>
+  <div class="rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+    <% if @invoices.empty? %>
+      <p class="p-5 text-sm text-slate-500"><%= t("invoices.empty") %></p>
+    <% end %>
+    <% @invoices.each do |invoice| %>
+      <div class="p-4 flex items-center justify-between gap-3">
+        <div>
+          <p class="font-semibold">
+            <%= invoice.student_name_snapshot %> <%# TEN-004 스냅샷 %>
+            <span class="<%= invoice_status_badge_class(invoice.status) %>"><%= t("invoices.status.#{invoice.status}") %></span>
+          </p>
+          <p class="text-sm text-slate-500">
+            <%= number_with_delimiter(invoice.base_amount) %><%= t("invoices.won") %>
+            <% if invoice.adjustment_amount != 0 %>
+              (<%= invoice.adjustment_amount.positive? ? "+" : "" %><%= number_with_delimiter(invoice.adjustment_amount) %><%= t("invoices.won") %>)
+            <% end %>
+            · <%= t("invoices.due", date: invoice.due_on&.strftime("%-m/%-d")) %>
+            <% if invoice.adjustment_note.present? %> · <%= invoice.adjustment_note %><% end %>
+          </p>
+        </div>
+        <div class="flex gap-2 shrink-0">
+          <%= link_to t("common.edit"), edit_invoice_path(invoice),
+                class: "min-h-11 px-3 inline-flex items-center rounded-lg border border-slate-300 text-sm" %>
+          <% unless invoice.CANCELLED? %>
+            <%= link_to t("invoices.cancel_action"), cancel_invoice_path(invoice),
+                  class: "min-h-11 px-3 inline-flex items-center rounded-lg border border-red-200 text-red-600 text-sm" %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <%= link_to t("invoices.results_link"), results_invoices_path(month: @month),
+        class: "block text-center min-h-11 px-4 py-3 rounded-lg border border-slate-300 bg-white text-sm font-semibold" %>
+</div>

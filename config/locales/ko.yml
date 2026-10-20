@@ -1,4 +1,7 @@
 ko:
+  time:
+    formats:
+      short: "%Y-%m-%d %H:%M"
   date:
     formats:
       default: "%Y-%m-%d"
@@ -75,6 +78,13 @@ ko:
     next_action: "다음: 원생 등록"
     students_link: "원생 관리로 이동"
     empty: "아직 표시할 내용이 없습니다."
+    invoices_link: "이번 달 청구 만들기"
+    invoices_hint: "월간 청구 생성 → 미리보기·확정 → 알림톡 발송"
+    reminders_link: "미납 리마인더"
+    todo_title: "오늘 할 일"
+    unpaid_count: "미납 청구"
+    upcoming_reminders: "다가오는 리마인더"
+    amount_basis: "미납 기준: 취소 청구 제외·납부 기한 경과 건"
   students:
     index:
       title: "원생 관리"
@@ -192,13 +202,235 @@ ko:
         phone_number: 휴대폰번호
         password: 비밀번호
         password_confirmation: 비밀번호 확인
+      invoice:
+        target_month: "청구월"
+        student_name_snapshot: "원생명"
+        base_amount: "기본 원비"
+        adjustment_amount: 조정액
+        adjustment_note: 비고
+        due_on: "납부 기한"
+        status: 상태
+        change_reason: "변경 사유"
+      message_log:
+        channel: 채널
+        template_type: "템플릿 유형"
+        status: 상태
     errors:
       messages:
         invalid_business_number: "형식이 올바르지 않습니다. 10자리 숫자로 입력해 주세요."
         invalid_phone: "형식이 올바르지 않습니다. 휴대폰번호를 확인해 주세요."
+        invalid_month: "형식이 올바르지 않습니다(YYYY-MM)."
+        duplicate_dispatch: "이미 발송된 이력이 있습니다. '다시 보내기'를 사용해 주세요."
+        night_send_forbidden: "발송 시각은 오전 9시~오후 5시 사이여야 합니다(야간 발송 금지)."
   enums:
     tenant:
       business_type:
         academy: 교습소
         study_room: 공부방
         arts_pe: "예술·체육 교습소"
+    invoice:
+      status:
+        DRAFT: 초안
+        READY: "발송 대기"
+        SENT: "발송 완료"
+        UNPAID: 미납
+        OVERDUE: "기한 초과"
+        CANCELLED: 취소
+    message_log:
+      status:
+        QUEUED: 대기
+        SENDING: "발송 중"
+        SENT: 성공
+        FAILED: 실패
+        FALLBACK_SENT: "대체 발송"
+        SIMULATED: 시뮬레이션
+      channel:
+        alimtalk: 알림톡
+        sms: "SMS/LMS"
+      template_type:
+        invoice_notice: "납부 안내"
+        reminder_d3: "리마인더(D+3)"
+        reminder_d7: "리마인더(D+7)"
+        reminder_month_end: "리마인더(월말)"
+  invoices:
+    title: "%{month} 청구"
+    won: 원
+    due: "기한 %{date}"
+    empty: "이번 달 청구가 아직 없습니다. 아래에서 청구를 만들어 주세요."
+    prev_month: "이전 달"
+    next_month: "다음 달"
+    confirm: "미리보기 확정(발송 대기 전환)"
+    confirm_confirm: "초안 청구를 확정할까요? 확정 후 금액 수정은 변경 사유 기록이 필요합니다."
+    cancel_action: 취소
+    status:
+      DRAFT: 초안
+      READY: "발송 대기"
+      SENT: "발송 완료"
+      UNPAID: 미납
+      OVERDUE: "기한 초과"
+      CANCELLED: 취소
+    results_link: "발송 결과 보기"
+    create:
+      title: "이번 달 청구 만들기"
+      description: "재원 원생 전원의 당월 청구 초안을 생성합니다. 이미 있는 청구는 건너뜁니다."
+      submit: 만들기
+    summary:
+      title: 미리보기
+      count: "발송 대상"
+      people: 명
+      total: "총 청구액"
+      pending_students: "미생성 재원 원생 %{count}명 — 청구 만들기를 실행하면 포함됩니다."
+    send:
+      select: "발송 대상 선택(확정된 청구만)"
+      scheduled: "예약 발송"
+      submit: 발송하기
+      confirm: "선택한 청구의 납부 안내를 발송할까요?"
+    edit:
+      title: "%{name} · %{month} 청구 조정"
+      base_amount: "기본 원비"
+      adjustment_amount: "조정액(할인은 음수)"
+      adjustment_note: 비고
+      change_reason: "변경 사유 (필수)"
+      change_reason_notice: "확정된 청구입니다. 금액 수정 시 변경 사유가 기록됩니다."
+      history: "변경 이력"
+    cancel:
+      title: 청구 취소
+      reason: "취소 사유 (필수)"
+      notice: "취소된 청구는 수납 합계에서 제외됩니다."
+      submit: 취소 처리
+      confirm: "이 청구를 취소할까요? 되돌릴 수 없습니다."
+    results:
+      title: "%{month} 발송 결과"
+      empty: "발송 이력이 없습니다."
+    notices:
+      generated: "%{month} 청구 생성: 신규 %{created}건, 기존 스킵 %{skipped}건"
+      confirmed: "%{count}건을 확정했습니다(발송 대기)."
+      dispatched: "발송 큐 등록 %{queued}건(중복 제외 %{duplicated}건, 수신처 없음 %{missing}건)%{scheduled}"
+      updated: "청구를 수정했습니다."
+      cancelled: "청구를 취소했습니다."
+      resent: "다시 보내기를 큐에 등록했습니다."
+      queue_cancelled: "예약 발송을 취소했습니다."
+    errors:
+      cancel_reason_blank: "취소 사유를 입력해 주세요."
+      resend_failed: "다시 보내기를 등록하지 못했습니다."
+      resend_not_allowed: "이 상태의 청구는 다시 보낼 수 없습니다."
+      not_editable: "발송이 시작되었거나 취소된 청구는 수정할 수 없습니다."
+      invalid_send_at: "예약 시각을 확인해 주세요."
+      queue_cancel_failed: "예약 취소에 실패했습니다(이미 발송되었을 수 있습니다)."
+    scheduled_suffix: "(예약)"
+  reminders:
+    title: "미납 리마인더"
+    settings_link: "설정"
+    history_link: "발송 이력"
+    index:
+      subtitle: "납부 기한이 지난 미납 청구입니다. 선택해 즉시 발송하거나 설정에 따라 자동 발송됩니다."
+      empty: "기한이 경과한 미납 청구가 없습니다."
+      excluded_filter: "제외 원생만 보기"
+      back_to_all: "전체 보기"
+      select_all: "전체 선택"
+      preview: "발송 미리보기"
+      student: 원생
+      amount: 금액
+      due_on: "납부 기한"
+      days_overdue: "경과일"
+      last_reminder: "마지막 리마인더"
+      none: 없음
+      exclusion: 제외
+      excluded_badge: "제외됨"
+      toggle_include: "제외 해제"
+      toggle_exclude: "리마인더 제외"
+      days: "%{days}일"
+      stage:
+        d3: "D+3"
+        d7: "D+7"
+        month_end: "월말"
+    preview:
+      title: "즉시 발송 미리보기"
+      recipient: 수신자
+      no_recipient: "수신처 없음 — 발송 대상에서 제외됩니다"
+      notice_excluded: "자동 발송 제외 원생입니다(수동 발송은 원장 판단에 따릅니다)."
+      submit: 발송하기
+      confirm: "미리보기한 내용으로 리마인더를 발송할까요?"
+      back: "목록으로"
+    settings:
+      title: "리마인더 설정"
+      tone: "문구 톤"
+      tone_options:
+        soft: "부드러움"
+        standard: "표준"
+        formal: "공식"
+      tone_hint: "원장이 직접 문구를 저장하면 해당 단계에는 커스텀 문구가 우선 적용됩니다."
+      send_hour: "발송 시각"
+      send_hour_hint: "오전 9시~오후 5시 사이로만 설정할 수 있습니다(야간 발송 금지)."
+      stages: "자동 발송 단계"
+      custom_text: "커스텀 문구 (비우면 기본 문구 사용)"
+      custom_hint: "변수: %{student_name}, %{month}, %{amount}, %{due}, %{account}, %{academy_name}, %{owner_phone}"
+      preview_title: "문구 미리보기(예시 데이터)"
+      stage_d3: "D+3 (기한 경과 3일)"
+      stage_d7: "D+7 (기한 경과 7일)"
+      stage_month_end: "월말 D-1 (말일 전날)"
+    history:
+      title: "리마인더 발송 이력"
+      empty: "리마인더 발송 이력이 없습니다."
+      filter_all: "전체 원생"
+      student: 원생
+      month: 청구월
+      sent_at: 발송 일시
+      status: 상태
+      channel: 채널
+    notices:
+      dispatched: "리마인더 발송 큐 등록 %{queued}건(중복 제외 %{duplicated}건, 수신처 없음 %{missing}건)"
+      settings_saved: "리마인더 설정을 저장했습니다."
+      excluded: "%{name} 원생을 리마인더에서 제외했습니다. 자동 발송에서 즉시 배제됩니다."
+      included: "%{name} 원생의 리마인더 제외를 해제했습니다."
+  messages:
+    errors:
+      no_recipient: "대표 보호자 연락처가 없어 발송할 수 없습니다."
+      invoice_cancelled: "취소된 청구의 안내는 발송되지 않습니다."
+    simulated_note: "연습 모드 또는 연동 키 미설정 — 실제 발송 없이 기록되었습니다."
+    resend_badge: "다시 보내기"
+    queued_note: "발송 대기열에서 대기 중입니다."
+    sent_at: "발송 %{at}"
+    error_line: "실패(%{code}): %{message}"
+    resend: "다시 보내기"
+    cancel_queue: "예약 취소"
+    cancel_queue_confirm: "이 예약 발송을 취소할까요?"
+    month_name: "%{month}월"
+    due_date: "%{date}까지"
+    channel:
+      alimtalk: 알림톡
+      sms: SMS/LMS
+    template:
+      invoice_notice: "납부 안내"
+      reminder_d3: "리마인더(D+3)"
+      reminder_d7: "리마인더(D+7)"
+      reminder_month_end: "리마인더(월말)"
+    status:
+      QUEUED: 대기
+      SENDING: "발송 중"
+      SENT: 성공
+      FAILED: 실패
+      FALLBACK_SENT: "대체 발송(SMS/LMS)"
+      SIMULATED: 시뮬레이션
+    invoice_notice:
+      sms_subject: "원비 납부 안내"
+      sms_text: "[%{academy_name}] 안녕하세요, %{student_name} 학부모님. %{month} 원비 %{amount} 안내드립니다. 계좌: %{account}. 납부 기한: %{due}. 문의: %{owner_phone}"
+    reminder:
+      sms_subject:
+        d3: "원비 납부 확인 요청"
+        d7: "원비 미납 안내"
+        month_end: "원비 미납 최종 안내"
+      # 기본 문구 3종(부드러움/표준/공식) — 원장 커스텀 문구 저장 시 우선 적용
+      text:
+        d3:
+          soft: "[%{academy_name}] %{student_name} 학부모님, 바쁜 와중에 죄송합니다. %{month} 원비(%{amount}) 납부가 아직 확인되지 않아 살짝 여쭤봅니다. 이미 보내셨다면 너그러운 양해 부탁드립니다. 계좌: %{account}. 문의: %{owner_phone}"
+          standard: "[%{academy_name}] %{student_name} 학부모님, %{month} 원비 %{amount}이 아직 입금 확인되지 않았습니다. 확인 후 %{due} 내 납부 부탁드립니다. 계좌: %{account}. 문의: %{owner_phone}"
+          formal: "[%{academy_name}] %{student_name} 학부모님께. %{month} 원비 %{amount} 납부가 기한(%{due})까지 확인되지 않았습니다. 서두에 납부해 주시기 바랍니다. 계좌: %{account}. 문의: %{owner_phone}"
+        d7:
+          soft: "[%{academy_name}] %{student_name} 학부모님, %{month} 원비 %{amount}이 아직 확인되지 않아 다시 연락드립니다. 혹시 납부에 어려움이 있으시면 편하게 말씀해 주세요. 계좌: %{account}. 문의: %{owner_phone}"
+          standard: "[%{academy_name}] %{student_name} 학부모님, %{month} 원비 %{amount}이 기한(%{due}) 경과 후에도 미납 상태입니다. 빠른 확인 부탁드립니다. 계좌: %{account}. 문의: %{owner_phone}"
+          formal: "[%{academy_name}] %{student_name} 학부모님께. %{month} 원비 %{amount}이 납부 기한(%{due}) 경과 후에도 미수납 상태임을 안내드립니다. 계좌: %{account}. 문의: %{owner_phone}"
+        month_end:
+          soft: "[%{academy_name}] %{student_name} 학부모님, 월마감이 다가와 다시 여쭤봅니다. %{month} 원비 %{amount}이 아직 확인되지 않았어요. 계좌: %{account}. 문의: %{owner_phone}"
+          standard: "[%{academy_name}] %{student_name} 학부모님, 이번 달 마감 전까지 %{month} 원비 %{amount} 미납건의 확인이 필요합니다. 계좌: %{account}. 문의: %{owner_phone}"
+          formal: "[%{academy_name}] %{student_name} 학부모님께. 월말 기준 %{month} 원비 %{amount}이 미수납 상태입니다. 기한 내 납부가 필요합니다. 계좌: %{account}. 문의: %{owner_phone}"

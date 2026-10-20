@@ -1,6 +1,9 @@
 class OnboardingController < ApplicationController
   STEPS = [ 2, 3, 4, 5 ].freeze
 
+  # 온보딩 화면 자체는 게이트 제외(게이트가 온보딩으로 리다이렉트하는 대상이므로 — W1 후속)
+  skip_before_action :ensure_onboarding_complete
+
   before_action :skip_if_onboarding_complete
   before_action :restrict_step_range
 
@@ -55,7 +58,13 @@ class OnboardingController < ApplicationController
   end
 
   def save_bank_account
-    if @tenant.update(bank_params)
+    @tenant.assign_attributes(bank_params)
+    unless @tenant.valid?(:bank_info) # W1 후속: 계좌 3필드 서버측 presence(step2와 동일 패턴)
+      flash.now[:alert] = t("errors.form")
+      return render :step3, status: :unprocessable_entity
+    end
+
+    if @tenant.save
       advance_step(3)
     else
       flash.now[:alert] = t("errors.form")

@@ -1,0 +1,47 @@
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold"><%= t("invoices.results.title", month: @month) %></h1>
+    <%= link_to t("common.back"), invoices_path(month: @month),
+          class: "min-h-11 px-3 inline-flex items-center rounded-lg border border-slate-300 bg-white text-sm" %>
+  </div>
+
+  <div class="rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+    <% if @logs.empty? %>
+      <p class="p-5 text-sm text-slate-500"><%= t("invoices.results.empty") %></p>
+    <% end %>
+    <% @logs.each do |log| %>
+      <div class="p-4 space-y-1">
+        <p class="font-semibold text-sm">
+          <%= log.invoice.student_name_snapshot %> ·
+          <span class="<%= message_status_badge_class(log.status) %>"><%= t("messages.status.#{log.status}") %></span>
+          <% if log.resend_of_id.present? %>
+            <span class="ml-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs"><%= t("messages.resend_badge") %></span>
+          <% end %>
+        </p>
+        <p class="text-sm text-slate-500">
+          <%= t("messages.channel.#{log.channel}") %> ·
+          <%= t("messages.template.#{log.template_type}") %> ·
+          <%= l(log.created_at, format: :short) %>
+          <% if log.sent_at.present? %> · <%= t("messages.sent_at", at: l(log.sent_at, format: :short)) %><% end %>
+        </p>
+        <% if log.FAILED? %>
+          <p class="text-sm text-red-600"><%= t("messages.error_line", code: log.error_code, message: log.error_message) %></p>
+          <%# MSG-001 예외: 원장 명시 '다시 보내기' %>
+          <%= button_to t("messages.resend"), resend_invoice_path(log.invoice, month: @month),
+                class: "mt-2 min-h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm font-semibold" %>
+        <% end %>
+        <% if log.QUEUED? %>
+          <p class="text-sm text-blue-700"><%= t("messages.queued_note") %></p>
+          <%# MSG-007: 예약 발송 취소 %>
+          <%= button_to t("messages.cancel_queue"), invoice_message_log_path(message_log_id: log.id),
+                method: :delete,
+                data: { turbo_confirm: t("messages.cancel_queue_confirm") },
+                class: "mt-2 min-h-11 px-3 rounded-lg border border-red-200 text-red-600 bg-white text-sm font-semibold" %>
+        <% end %>
+        <% if log.SIMULATED? %>
+          <p class="text-xs text-violet-600"><%= t("messages.simulated_note") %></p>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>

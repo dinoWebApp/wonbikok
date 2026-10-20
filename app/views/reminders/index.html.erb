@@ -1,0 +1,79 @@
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold"><%= t("reminders.title") %></h1>
+    <div class="flex gap-2">
+      <%= link_to t("reminders.settings_link"), reminder_settings_path,
+            class: "min-h-11 px-3 inline-flex items-center rounded-lg border border-slate-300 bg-white text-sm" %>
+      <%= link_to t("reminders.history_link"), reminder_history_path,
+            class: "min-h-11 px-3 inline-flex items-center rounded-lg border border-slate-300 bg-white text-sm" %>
+    </div>
+  </div>
+
+  <p class="text-sm text-slate-500"><%= t("reminders.index.subtitle") %></p>
+
+  <% if @invoices.empty? %>
+    <div class="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">
+      <%= t("reminders.index.empty") %>
+    </div>
+  <% else %>
+    <%# 즉시 발송: 선택 → 미리보기 → 발송 (MSG-001 유일성은 Dispatcher가 보장) %>
+    <%= form_with url: reminder_preview_path, method: :get, class: "space-y-3" do %>
+      <div class="flex items-center justify-between">
+        <label class="flex items-center gap-2 text-sm">
+          <%= check_box_tag :select_all, "1", false,
+                data: { controller: "reminders-select-all",
+                        action: "reminders-select-all#toggle" } %>
+          <%= t("reminders.index.select_all") %>
+        </label>
+        <%= submit_tag t("reminders.index.preview"),
+              class: "min-h-11 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold" %>
+      </div>
+
+      <div class="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+        <% @invoices.each do |invoice| %>
+          <div class="flex items-start gap-3 p-4">
+            <%= check_box_tag "invoice_ids[]", invoice.id, false, id: "invoice_#{invoice.id}" %>
+            <div class="flex-1 text-sm">
+              <p class="font-semibold">
+                <%= invoice.student_name_snapshot %>
+                <% if invoice.student.excluded_from_reminders? %>
+                  <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500"><%= t("reminders.index.excluded_badge") %></span>
+                <% end %>
+              </p>
+              <p class="text-slate-500">
+                <%= number_with_delimiter(invoice.total_amount) %><%= t("invoices.won") %>
+                · <%= t("reminders.index.due_on") %> <%= invoice.due_on.strftime("%-m/%-d") %>
+                · <%= t("reminders.index.days_overdue") %>
+                  <%= t("reminders.index.days", days: invoice.days_overdue) %>
+                <% stage = Reminders::Scheduler.due_stage_for(invoice) %>
+                <% if stage %>
+                  · <%= t("reminders.index.stage.#{stage}") %>
+                <% end %>
+              </p>
+              <p class="text-xs text-slate-400">
+                <%= t("reminders.index.last_reminder") %>:
+                <% if (last = @last_reminder_at[invoice.id]) %>
+                  <%= l(last, format: :short) %>
+                <% else %>
+                  <%= t("reminders.index.none") %>
+                <% end %>
+              </p>
+            </div>
+            <%# 제외 토글 — 해제 시 자동 발송 즉시 배제(MSG-004) %>
+            <%= button_to invoice.student.excluded_from_reminders? ? t("reminders.index.toggle_include") : t("reminders.index.toggle_exclude"),
+                  reminder_student_exclusion_path(invoice.student_id), method: :patch,
+                  class: "min-h-9 px-2 rounded-lg border border-slate-300 bg-white text-xs" %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <p class="text-sm">
+      <% if @excluded_only %>
+        <%= link_to t("reminders.index.back_to_all"), reminders_path, class: "text-blue-600" %>
+      <% else %>
+        <%= link_to t("reminders.index.excluded_filter"), reminders_path(excluded: 1), class: "text-blue-600" %>
+      <% end %>
+    </p>
+  <% end %>
+</div>

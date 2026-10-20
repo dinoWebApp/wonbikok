@@ -1,0 +1,43 @@
+<div class="space-y-4">
+  <h1 class="text-xl font-bold"><%= t("reminders.preview.title") %></h1>
+
+  <% if @previews.empty? %>
+    <div class="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">
+      <%= t("reminders.index.empty") %>
+    </div>
+  <% else %>
+    <%= form_with url: reminder_dispatch_path, method: :post, class: "space-y-3" do %>
+      <% @previews.each do |preview| %>
+        <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm">
+          <p class="font-semibold">
+            <%= preview[:invoice].student_name_snapshot %>
+            · <%= t("reminders.index.stage.#{preview[:stage]}") %>
+          </p>
+          <p class="text-slate-500">
+            <%= t("reminders.preview.recipient") %>:
+            <% if preview[:missing] %>
+              <span class="text-amber-600"><%= t("reminders.preview.no_recipient") %></span>
+            <% else %>
+              <%= masked_phone(preview[:phone]) %>
+            <% end %>
+          </p>
+          <% if preview[:excluded] %>
+            <p class="mt-1 text-xs text-amber-600"><%= t("reminders.preview.notice_excluded") %></p>
+          <% end %>
+          <pre class="mt-2 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs text-slate-700"><%= preview[:text] %></pre>
+          <% unless preview[:missing] %>
+            <%= hidden_field_tag "invoice_ids[]", preview[:invoice].id %>
+          <% end %>
+        </div>
+      <% end %>
+
+      <div class="flex gap-2">
+        <%= submit_tag t("reminders.preview.submit"),
+              data: { turbo_confirm: t("reminders.preview.confirm") },
+              class: "min-h-11 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold" %>
+        <%= link_to t("reminders.preview.back"), reminders_path,
+              class: "min-h-11 px-4 inline-flex items-center rounded-lg border border-slate-300 bg-white text-sm" %>
+      </div>
+    <% end %>
+  <% end %>
+</div>

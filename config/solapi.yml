@@ -1,0 +1,37 @@
+# 솔라피 연동 설정 (config/credentials.yml.enc 편집 권장):
+#   solapi:
+#     api_key: NCSxxxxxxxxxxxx
+#     api_secret: xxxxxxxxxxxxxxxx
+#     from: "0212345678"           # 사전 등록 발신번호(대체발송 필수 — messages-disablesms)
+#     kakao:
+#       pf_id: "EPxxxxx"           # 카카오톡 채널 연동 아이디
+#       templates:
+#         invoice_notice: "템플릿코드"   # F3 납부 안내(운영 주입)
+#         reminder_d3: "템플릿코드"      # F6 리마인더(기한 경과 3일)
+#         reminder_d7: "템플릿코드"      # F6 리마인더(기한 경과 7일)
+#         reminder_month_end: "템플릿코드" # F6 리마인더(월말 D-1)
+#
+# api_key/api_secret 미설정 시 발송 시도는 SIMULATED 처리된다(연습 모드 동일).
+shared:
+  api_key: ""
+  api_secret: ""
+  from: ""
+  kakao:
+    pf_id: ""
+    templates:
+      invoice_notice: ""
+      reminder_d3: ""
+      reminder_d7: ""
+      reminder_month_end: ""
+
+test:
+  api_key: ""
+  api_secret: ""
+  from: ""
+  kakao:
+    pf_id: ""
+    templates:
+      invoice_notice: ""
+      reminder_d3: ""
+      reminder_d7: ""
+      reminder_month_end: ""
