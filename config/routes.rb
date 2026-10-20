@@ -1,14 +1,29 @@
 Rails.application.routes.draw do
-  # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
-
-  # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
-  # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
-  # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
-  # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
+  # 원장 인증 (가입·로그인·로그아웃)
+  resource :registration, only: %i[new create]
+  resource :session, only: %i[new create destroy]
 
-  # Defines the root path route ("/")
-  # root "posts#index"
+  # 온보딩 마법사 (2~5스텝, 1스텝은 가입)
+  get "onboarding/step/:step", to: "onboarding#show", as: :onboarding_step
+  patch "onboarding/step/:step", to: "onboarding#update"
+
+  # 원생 관리 (목록·상세·등록·수정·상태 변경, CSV 일괄 등록)
+  resources :students do
+    collection do
+      get "import", action: :import_new
+      post "import", action: :import
+      get "import/template", action: :import_template
+      get "import/errors", action: :import_errors, defaults: { format: :csv }
+    end
+    member do
+      patch :pause
+      patch :withdraw
+      patch :restore
+    end
+  end
+
+  # 대시보드 (루트: 인증 상태별 분기)
+  root "dashboard#show"
 end

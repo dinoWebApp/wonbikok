@@ -1,0 +1,66 @@
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-bold"><%= t("students.show.title") %></h1>
+  <%= link_to t("common.back"), students_path, class: "text-sm text-slate-600" %>
+</div>
+
+<% if @sibling_students.any? %>
+  <div class="mb-4 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 px-4 py-3 text-sm">
+    <p><%= t("students.badges.sibling") %>: <%= @sibling_students.map(&:name).join(", ") %></p>
+    <p class="mt-1 text-sky-700"><%= t("students.show.sibling_notice") %></p>
+  </div>
+<% end %>
+
+<div class="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
+  <div class="flex items-center justify-between">
+    <span class="font-semibold text-lg"><%= @student.name %></span>
+    <div class="flex items-center gap-1">
+      <span class="rounded-full px-2 py-0.5 text-xs font-semibold <%= status_badge_class(@student.status) %>">
+        <%= t("students.status.#{@student.status}") %>
+      </span>
+      <!-- 이번 달 상태: 청구 기능(W2) 전까지 대기 고정 -->
+      <span class="rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-xs"><%= t("students.badges.month_waiting") %></span>
+    </div>
+  </div>
+
+  <dl class="text-sm divide-y divide-slate-100">
+    <div class="flex justify-between py-2"><dt class="text-slate-500"><%= t("activerecord.attributes.student.grade") %></dt><dd><%= @student.grade.presence || "-" %></dd></div>
+    <div class="flex justify-between py-2"><dt class="text-slate-500"><%= t("activerecord.attributes.student.monthly_fee") %></dt><dd><%= number_with_delimiter(@student.monthly_fee) %><%= t("students.index.won") %></dd></div>
+    <div class="flex justify-between py-2"><dt class="text-slate-500"><%= t("activerecord.attributes.student.payment_day") %></dt><dd><%= t("students.show.payment_day_of_month", day: @student.payment_day) %></dd></div>
+    <div class="flex justify-between py-2"><dt class="text-slate-500"><%= t("activerecord.attributes.student.payment_type") %></dt><dd><%= t("students.payment_type.#{@student.payment_type}") %></dd></div>
+    <div class="flex justify-between py-2"><dt class="text-slate-500"><%= t("students.show.guardian") %></dt><dd>
+      <% guardian = @student.primary_guardian %>
+      <% if guardian %>
+        <%= guardian.name %> · <%= masked_phone(guardian.phone_number) %>
+      <% end %>
+    </dd></div>
+    <% if @student.started_on.present? %>
+      <div class="flex justify-between py-2"><dt class="text-slate-500"><%= t("activerecord.attributes.student.started_on") %></dt><dd><%= l(@student.started_on) %></dd></div>
+    <% end %>
+    <% if @student.ended_on.present? %>
+      <div class="flex justify-between py-2"><dt class="text-slate-500"><%= t("activerecord.attributes.student.ended_on") %></dt><dd><%= l(@student.ended_on) %></dd></div>
+    <% end %>
+    <% if @student.memo.present? %>
+      <div class="flex justify-between py-2"><dt class="text-slate-500"><%= t("activerecord.attributes.student.memo") %></dt><dd class="text-right"><%= @student.memo %></dd></div>
+    <% end %>
+  </dl>
+</div>
+
+<!-- 이번 달 납부·발행 이력: 청구 기능(W2 F3/F4) 제공 전 빈 상태 안내 -->
+<div class="mt-4 rounded-xl border border-slate-200 bg-white p-5">
+  <h2 class="font-semibold mb-2"><%= t("students.show.history_title") %></h2>
+  <p class="text-sm text-slate-500"><%= t("students.show.history_empty") %></p>
+</div>
+
+<div class="mt-6 flex flex-wrap gap-2">
+  <%= link_to t("common.edit"), edit_student_path(@student),
+        class: "min-h-11 px-4 flex items-center rounded-lg border border-slate-300 bg-white text-sm" %>
+  <% if @student.status_active? %>
+    <%= button_to t("students.actions.pause"), pause_student_path(@student), method: :patch,
+          class: "min-h-11 px-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-sm" %>
+    <%= button_to t("students.actions.withdraw"), withdraw_student_path(@student), method: :patch,
+          class: "min-h-11 px-4 rounded-lg border border-red-300 bg-red-50 text-red-800 text-sm" %>
+  <% else %>
+    <%= button_to t("students.actions.restore"), restore_student_path(@student), method: :patch,
+          class: "min-h-11 px-4 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 text-sm" %>
+  <% end %>
+</div>

@@ -1,0 +1,30 @@
+<h1 class="text-xl font-bold mb-4"><%= t("students.import.result_title") %></h1>
+
+<div class="rounded-xl border border-slate-200 bg-white p-5 mb-4">
+  <div class="flex gap-6 text-sm">
+    <p><span class="text-emerald-700 font-semibold"><%= t("students.import.success", count: @result.success_count) %></span></p>
+    <p><span class="text-red-700 font-semibold"><%= t("students.import.failed", count: @result.errors.size) %></span></p>
+  </div>
+</div>
+
+<% if @result.errors.any? %>
+  <div class="rounded-xl border border-red-200 bg-white p-5 mb-4">
+    <h2 class="font-semibold mb-2"><%= t("students.import.error_detail_title") %></h2>
+    <ul class="text-sm space-y-1">
+      <% @result.errors.each do |error| %>
+        <li class="text-red-700">
+          <%= t("students.import.error_line", line: error.line) %>: <%= error.reasons.join(" / ") %>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+
+  <div class="flex flex-col gap-2">
+    <%= link_to t("students.import.download_errors"), import_errors_students_path,
+          class: "min-h-11 px-4 flex items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-800 text-sm font-semibold" %>
+    <p class="text-xs text-slate-500"><%= t("students.import.errors_reupload_notice") %></p>
+  </div>
+<% else %>
+  <%= link_to t("students.import.back_to_list"), students_path,
+        class: "min-h-11 px-4 inline-flex items-center rounded-lg bg-slate-900 text-white text-sm font-semibold" %>
+<% end %>

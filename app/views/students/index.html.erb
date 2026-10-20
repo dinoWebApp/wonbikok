@@ -1,0 +1,65 @@
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-bold"><%= t("students.index.title") %></h1>
+  <div class="flex items-center gap-2">
+    <%= link_to t("students.import.title"), import_students_path,
+          class: "min-h-11 px-3 flex items-center rounded-lg border border-slate-300 bg-white text-sm text-slate-700" %>
+    <%= link_to t("students.index.new"), new_student_path,
+          class: "min-h-11 px-4 flex items-center rounded-lg bg-slate-900 text-white text-sm font-semibold" %>
+  </div>
+</div>
+
+<%= form_with url: students_path, method: :get, local: true, class: "mb-4" do |form| %>
+  <div class="flex gap-2">
+    <%= form.text_field :q, value: params[:q], placeholder: t("students.index.search_name"),
+          class: "min-h-11 flex-1 rounded-lg border border-slate-300 px-3 text-base" %>
+    <%= form.text_field :phone_last4, value: params[:phone_last4], maxlength: 4, inputmode: "numeric",
+          placeholder: t("students.index.search_phone_last4"),
+          class: "min-h-11 w-24 rounded-lg border border-slate-300 px-3 text-base" %>
+    <%= form.submit t("students.index.search"),
+          class: "min-h-11 px-4 rounded-lg bg-slate-100 border border-slate-300 text-sm" %>
+  </div>
+<% end %>
+
+<div class="flex gap-2 mb-4 text-sm">
+  <% [ [ nil, t("students.filter.all") ], %w[active 재원], %w[paused 휴원], %w[withdrawn 퇴원] ].each do |status, label| %>
+    <% active_filter = params[:status].presence == status %>
+    <%= link_to label, students_path(request.query_parameters.except("status").merge(status: status)),
+          class: "min-h-9 px-3 flex items-center rounded-full border #{active_filter ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}" %>
+  <% end %>
+</div>
+
+<% if @students.any? %>
+  <ul class="space-y-3">
+    <% @students.each do |student| %>
+      <li>
+        <%= link_to student_path(student), class: "block rounded-xl border border-slate-200 bg-white p-4" do %>
+          <div class="flex items-center justify-between">
+            <span class="font-semibold"><%= student.name %></span>
+            <div class="flex items-center gap-1">
+              <% if @sibling_student_ids.include?(student.id) %>
+                <span class="rounded-full bg-sky-100 text-sky-800 px-2 py-0.5 text-xs font-semibold"><%= t("students.badges.sibling") %></span>
+              <% end %>
+              <span class="rounded-full px-2 py-0.5 text-xs font-semibold <%= status_badge_class(student.status) %>">
+                <%= t("students.status.#{student.status}") %>
+              </span>
+              <!-- 이번 달 상태: 청구 기능(W2) 전까지 대기 고정 -->
+              <span class="rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-xs"><%= t("students.badges.month_waiting") %></span>
+            </div>
+          </div>
+          <div class="mt-1 text-sm text-slate-600">
+            <% guardian = student.primary_guardian %>
+            <% if guardian %>
+              <%= guardian.name %> · <%= masked_phone(guardian.phone_number) %>
+            <% end %>
+            · <%= number_with_delimiter(student.monthly_fee) %><%= t("students.index.won") %>
+            <% if student.grade.present? %> · <%= student.grade %><% end %>
+          </div>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+<% else %>
+  <div class="rounded-xl border border-slate-200 bg-white p-6 text-center text-slate-500">
+    <%= t("students.index.empty") %>
+  </div>
+<% end %>

@@ -1,0 +1,16 @@
+one:
+  name: 김원장 학원
+  business_number: "1234567890"
+  business_type: academy
+  owner_name: 김원장
+  address: 서울시 강남구
+  bank_name: 국민은행
+  bank_account: "123456789"
+  account_holder: 김원장
+  practice: false
+  onboarding_step: 6
+
+two:
+  name: 박원장 학원
+  practice: false
+  onboarding_step: 2

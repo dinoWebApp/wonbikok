@@ -1,0 +1,31 @@
+<h1 class="text-xl font-bold mb-2"><%= t("students.import.title") %></h1>
+<p class="text-sm text-slate-600 mb-4"><%= t("students.import.description") %></p>
+
+<div class="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+  <div class="flex flex-col gap-2">
+    <%= link_to t("students.import.download_template"), import_template_students_path,
+          class: "min-h-11 px-4 flex items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-semibold" %>
+    <p class="text-xs text-slate-500"><%= t("students.import.template_notice") %></p>
+  </div>
+
+  <%= form_with url: import_students_path, method: :post, local: true, class: "space-y-3" do |form| %>
+    <div>
+      <%= form.label :file, t("students.import.file_label"), class: "block text-sm font-semibold mb-1" %>
+      <%= form.file_field :file, accept: ".csv,text/csv", required: true,
+            class: "w-full text-sm" %>
+    </div>
+    <p class="text-xs text-slate-500"><%= t("students.import.utf8_notice") %></p>
+    <%= form.submit t("students.import.submit"),
+          class: "min-h-11 w-full rounded-lg bg-slate-900 text-white font-semibold text-sm" %>
+  <% end %>
+</div>
+
+<div class="mt-4 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 space-y-1">
+  <p class="font-semibold text-slate-900"><%= t("students.import.rules_title") %></p>
+  <p><%= t("students.import.rules_required") %></p>
+  <p><%= t("students.import.rules_fee") %></p>
+  <p><%= t("students.import.rules_payment_day") %></p>
+  <p><%= t("students.import.rules_types") %></p>
+</div>
+
+<%= link_to t("common.back"), students_path, class: "mt-4 inline-block text-sm text-slate-600" %>

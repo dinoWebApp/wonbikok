@@ -1,0 +1,16 @@
+<p class="text-sm text-indigo-600 font-semibold mb-1"><%= t("onboarding.step_label", current: 3) %></p>
+<h1 class="text-xl font-bold mb-4"><%= t("onboarding.link.title") %></h1>
+
+<div class="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+  <p class="inline-block rounded-full bg-slate-100 text-slate-700 px-3 py-1 text-sm font-semibold">
+    <%= t("onboarding.link.status_pending") %>
+  </p>
+  <p><%= t("onboarding.link.description") %></p>
+  <p class="text-slate-600"><%= t("onboarding.link.disabled_notice") %></p>
+</div>
+
+<%= form_with url: onboarding_step_path(4), method: :patch, class: "mt-8" do %>
+  <button type="submit" class="w-full min-h-12 rounded-lg bg-indigo-600 text-white font-semibold text-base hover:bg-indigo-700">
+    <%= t("common.next") %>
+  </button>
+<% end %>

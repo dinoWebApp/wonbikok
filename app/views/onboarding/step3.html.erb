@@ -1,0 +1,22 @@
+<p class="text-sm text-indigo-600 font-semibold mb-1"><%= t("onboarding.step_label", current: 2) %></p>
+<h1 class="text-xl font-bold mb-1"><%= t("onboarding.bank.title") %></h1>
+<p class="text-slate-600 mb-6"><%= t("onboarding.bank.description") %></p>
+
+<%= form_with model: @tenant, url: onboarding_step_path(3), method: :patch, class: "space-y-5" do |form| %>
+  <div>
+    <%= form.label :bank_name, t("onboarding.bank.bank_name"), class: "block font-semibold mb-1" %>
+    <%= form.text_field :bank_name, class: "w-full min-h-11 rounded-lg border border-slate-300 px-3 text-base" %>
+  </div>
+  <div>
+    <%= form.label :bank_account, t("onboarding.bank.bank_account"), class: "block font-semibold mb-1" %>
+    <%= form.text_field :bank_account, inputmode: "numeric",
+          class: "w-full min-h-11 rounded-lg border border-slate-300 px-3 text-base" %>
+  </div>
+  <div>
+    <%= form.label :account_holder, t("onboarding.bank.account_holder"), class: "block font-semibold mb-1" %>
+    <%= form.text_field :account_holder, class: "w-full min-h-11 rounded-lg border border-slate-300 px-3 text-base" %>
+  </div>
+
+  <%= form.submit t("common.next"),
+        class: "w-full min-h-12 rounded-lg bg-indigo-600 text-white font-semibold text-base hover:bg-indigo-700" %>
+<% end %>

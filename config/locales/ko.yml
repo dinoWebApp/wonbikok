@@ -1,0 +1,204 @@
+ko:
+  date:
+    formats:
+      default: "%Y-%m-%d"
+  app_name: 원비콕
+  tagline: "원비 마감, 콕 찍고 끝"
+  errors:
+    form: "입력 내용을 확인해 주세요."
+  common:
+    next: "다음"
+    previous: "이전"
+    save: "저장"
+    cancel: "취소"
+    start: "시작하기"
+    back: "목록"
+    edit: "수정"
+  auth:
+    login_required: "로그인이 필요합니다."
+    invalid_credentials: "휴대폰번호 또는 비밀번호가 올바르지 않습니다."
+    signed_out: "로그아웃되었습니다."
+    sign_in: "로그인"
+    sign_out: "로그아웃"
+    sign_up: "회원가입"
+  registration:
+    title: "원비콕 회원가입"
+    description: "휴대폰번호와 비밀번호로 간단히 시작하세요. 원장님 = 계정 소유자입니다."
+    phone_number: "휴대폰번호"
+    password: "비밀번호 (8자 이상)"
+    password_confirmation: "비밀번호 확인"
+    tenant_name: "교습소(상호)명"
+    submit: "가입하고 시작하기"
+    completed: "가입이 완료되었습니다. 온보딩을 시작합니다."
+    duplicate_phone: "이미 가입된 휴대폰번호입니다. 로그인해 주세요."
+    have_account: "이미 계정이 있으신가요?"
+  session:
+    new:
+      title: "로그인"
+      phone_number: "휴대폰번호"
+      password: "비밀번호"
+      submit: "로그인"
+      no_account: "계정이 없으신가요?"
+  onboarding:
+    title: "설정 시작"
+    step_label: "%{current}단계 / 총 4단계"
+    completed: "설정이 완료되었습니다! 대시보드로 이동합니다."
+    business:
+      title: "사업자 정보 입력"
+      description: "현금영수증 발행과 안내 문구에 사용됩니다."
+      name: "상호"
+      business_number: "사업자등록번호 (10자리 숫자)"
+      business_type: "업종"
+      owner_name: "대표자명"
+      address: "사업장 주소"
+    bank:
+      title: "납부 계좌 등록"
+      description: "이 계좌 정보는 납부 안내 알림톡과 청구 링크에 자동 표기됩니다."
+      bank_name: "은행"
+      bank_account: "계좌번호"
+      account_holder: "예금주"
+    link:
+      title: "현금영수증 연동 안내"
+      status_pending: "연동 준비 중"
+      description: "현금영수증 자동 발행 연동은 준비 중입니다. 연동이 완료되면 홈택스 접속 없이 발행이 처리됩니다."
+      disabled_notice: "연동 완료 전에는 발행 기능이 비활성 상태입니다. 연동 완료 후 바로 사용할 수 있습니다."
+    practice:
+      title: "연습 모드로 시작할까요?"
+      description: "연습 모드에서는 샘플 원생 10명으로 기능을 미리 체험할 수 있습니다. 연습 모드에서는 실제 알림톡 발송과 현금영수증 발행이 발생하지 않습니다."
+      practice: "연습 모드로 시작"
+      practice_hint: "샘플 원생 10명이 자동 생성됩니다 (실제 발송·발행 없음)"
+      real: "바로 실제 사용 시작"
+      real_hint: "원생 관리에서 실제 원생을 등록하세요"
+  dashboard:
+    title: "대시보드"
+    ready: "설정이 모두 끝났습니다. 이번 달 원비 마감을 시작해 보세요."
+    next_action: "다음: 원생 등록"
+    students_link: "원생 관리로 이동"
+    empty: "아직 표시할 내용이 없습니다."
+  students:
+    index:
+      title: "원생 관리"
+      new: "원생 등록"
+      search: "검색"
+      search_name: "원생명"
+      search_phone_last4: "전화 뒷자리"
+      empty: "등록된 원생이 없습니다. 원생 등록 또는 CSV 일괄 등록으로 시작하세요."
+      won: "원"
+    filter:
+      all: "전체"
+    status:
+      active: "재원"
+      paused: "휴원"
+      withdrawn: "퇴원"
+    payment_type:
+      bank_transfer: "계좌이체"
+      cash: "현금"
+    badges:
+      sibling: "형제·자매"
+      month_waiting: "이번 달 대기"
+    show:
+      title: "원생 정보"
+      guardian: "대표 보호자"
+      payment_day_of_month: "매월 %{day}일"
+      sibling_notice: "같은 보호자 연락처로 등록된 원생이 있습니다."
+      history_title: "이번 달 납부·발행 이력"
+      history_empty: "아직 이력이 없습니다. 청구 기능은 다음 업데이트에 제공됩니다."
+    actions:
+      pause: "휴원 처리"
+      withdraw: "퇴원 처리"
+      restore: "재원 복원"
+    form:
+      title_new: "원생 등록"
+      title_edit: "%{name} 정보 수정"
+      grade_placeholder: "예: 초3"
+      guardian_section: "대표 보호자"
+      phone_notice: "휴대폰번호는 알림 발송과 현금영수증(소득공제) 발급에 사용됩니다."
+      conflict_title: "기존 원생과 중복될 수 있습니다"
+      conflict_notice: "같은 이름·연락처의 원생이 이미 있습니다. 형제·자매라면 아래 '저장'으로 계속 등록하세요."
+    notices:
+      created: "%{name} 원생을 등록했습니다."
+      updated: "수정했습니다."
+      status_changed: "상태를 %{status}(으)로 변경했습니다."
+    import:
+      title: "CSV 일괄 등록"
+      description: "양식을 내려받아 작성한 뒤 업로드하면 원생과 대표 보호자가 한 번에 등록됩니다."
+      download_template: "양식 다운로드 (CSV)"
+      template_notice: "양식 파일에는 실제 데이터가 포함되지 않습니다(예시 데이터만 포함)."
+      file_label: "CSV 파일 선택"
+      utf8_notice: "파일 인코딩은 UTF-8을 권장합니다. (CP949 등 다른 인코딩 지원은 추후 제공 예정)"
+      submit: "업로드"
+      result_title: "CSV 등록 결과"
+      success: "성공 %{count}건"
+      failed: "실패 %{count}건"
+      error_detail_title: "오류 상세"
+      error_line: "%{line}행"
+      download_errors: "오류행만 내려받기"
+      errors_reupload_notice: "내려받은 파일을 수정해 같은 양식으로 다시 업로드하면 오류행만 반영됩니다."
+      back_to_list: "목록으로"
+      rules_title: "작성 규칙"
+      rules_required: "원생명, 월 원비, 납부일, 납부유형, 상태, 보호자명, 보호자 휴대폰번호는 필수입니다."
+      rules_fee: "월 원비는 숫자(원 단위)로 입력하세요. 예: 250000"
+      rules_payment_day: "납부일은 1~28 사이 숫자입니다."
+      rules_types: "납부유형은 계좌이체/현금, 상태는 재원/휴원/퇴원으로 입력하세요."
+      errors:
+        no_file: "CSV 파일을 선택해 주세요."
+        expired: "오류 내역이 만료되었거나 없습니다. CSV를 다시 업로드해 주세요."
+        file_too_large: "파일이 너무 큽니다. 1MB 이하의 CSV로 나누어 업로드해 주세요."
+        encoding: "파일 인코딩을 읽을 수 없습니다. UTF-8로 저장 후 업로드해 주세요."
+        required_name: "원생명은 필수입니다."
+        required_fee: "월 원비는 숫자로 입력해 주세요."
+        payment_day: "납부일은 1~28 사이 숫자로 입력해 주세요."
+        payment_type: "납부유형은 계좌이체 또는 현금으로 입력해 주세요."
+        status: "상태는 재원/휴원/퇴원 중 하나로 입력해 주세요."
+        required_guardian_name: "보호자명은 필수입니다."
+        phone: "보호자 휴대폰번호 형식이 올바르지 않습니다. 예: 01012345678"
+        duplicate_suspect: "중복 의심 — 기존 원생 %{name}과(와) 보호자 연락처 또는 이름이 같습니다. 확인 후 등록해 주세요."
+  practice:
+    badge: "연습 모드"
+    notice: "연습 모드입니다. 실제 알림톡 발송과 현금영수증 발행은 발생하지 않습니다."
+  activerecord:
+    models:
+      tenant: 교습소
+      user: 원장
+      student: 원생
+      guardian: 보호자
+    attributes:
+      student:
+        name: 원생명
+        grade: 학년
+        monthly_fee: "월 원비"
+        payment_day: 납부일
+        payment_type: 납부유형
+        memo: 특이사항
+        status: 상태
+        started_on: 시작일
+        ended_on: 종료일
+        "status/active": 재원
+        "status/paused": 휴원
+        "status/withdrawn": 퇴원
+      guardian:
+        name: 보호자명
+        phone_number: 보호자 휴대폰번호
+      tenant:
+        name: 상호
+        business_number: 사업자등록번호
+        business_type: 업종
+        owner_name: 대표자명
+        address: 사업장 주소
+        bank_name: 은행
+        bank_account: 계좌번호
+        account_holder: 예금주
+      user:
+        phone_number: 휴대폰번호
+        password: 비밀번호
+        password_confirmation: 비밀번호 확인
+    errors:
+      messages:
+        invalid_business_number: "형식이 올바르지 않습니다. 10자리 숫자로 입력해 주세요."
+        invalid_phone: "형식이 올바르지 않습니다. 휴대폰번호를 확인해 주세요."
+  enums:
+    tenant:
+      business_type:
+        academy: 교습소
+        study_room: 공부방
+        arts_pe: "예술·체육 교습소"

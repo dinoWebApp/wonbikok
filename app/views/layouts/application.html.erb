@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
   <head>
-    <title><%= content_for(:title) || "Wonbikok" %></title>
+    <title><%= content_for(:title) || t("app_name") %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Wonbikok">
@@ -11,20 +11,46 @@
 
     <%= yield :head %>
 
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
-
     <link rel="icon" href="/icon.png" type="image/png">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
 
-    <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
-    <main class="container mx-auto mt-28 px-5 flex">
+  <body class="bg-slate-50 text-slate-900 text-base leading-relaxed">
+    <% if authenticated? %>
+      <header class="bg-white border-b border-slate-200">
+        <div class="mx-auto max-w-2xl px-4 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="font-bold"><%= t("app_name") %></span>
+            <% if practice_mode? %>
+              <span class="rounded-full bg-amber-100 text-amber-800 px-3 py-1 text-sm font-semibold"><%= t("practice.badge") %></span>
+            <% end %>
+          </div>
+          <div class="flex items-center gap-3">
+            <%= link_to t("students.index.title"), students_path, class: "text-sm text-slate-700 hover:text-slate-900" %>
+            <span class="text-sm text-slate-600"><%= current_tenant.name %></span>
+            <%= button_to t("auth.sign_out"), session_path, method: :delete,
+                  class: "min-h-11 px-3 text-sm text-slate-700 hover:text-slate-900" %>
+          </div>
+        </div>
+      </header>
+      <% if practice_mode? %>
+        <div class="bg-amber-50 border-b border-amber-200 text-amber-900 text-sm">
+          <p class="mx-auto max-w-2xl px-4 py-2"><%= t("practice.notice") %></p>
+        </div>
+      <% end %>
+    <% end %>
+
+    <main class="mx-auto max-w-2xl px-4 py-8">
+      <% if notice %>
+        <p class="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3"><%= notice %></p>
+      <% end %>
+      <% if alert %>
+        <p class="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-800 px-4 py-3"><%= alert %></p>
+      <% end %>
       <%= yield %>
     </main>
   </body>

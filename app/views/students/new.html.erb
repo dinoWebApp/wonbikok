@@ -1,0 +1,15 @@
+<h1 class="text-xl font-bold mb-4"><%= t("students.form.title_new") %></h1>
+
+<% if @conflicts.present? %>
+  <div class="mb-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 text-sm">
+    <p class="font-semibold"><%= t("students.form.conflict_title") %></p>
+    <ul class="mt-1 list-disc list-inside">
+      <% @conflicts.each do |conflict| %>
+        <li><%= link_to conflict.name, student_path(conflict), class: "underline" %> (<%= t("students.status.#{conflict.status}") %>)</li>
+      <% end %>
+    </ul>
+    <p class="mt-1"><%= t("students.form.conflict_notice") %></p>
+  </div>
+<% end %>
+
+<%= render "form", student: @student, confirm: @conflicts.present? %>

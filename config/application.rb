@@ -16,6 +16,9 @@ module Wonbikok
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
 
+    # 한국어 서비스 — 기본 로캘 ko
+    config.i18n.default_locale = :ko
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

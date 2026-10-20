@@ -1,0 +1,99 @@
+<%= form_with model: student,
+      url: confirm ? students_path(confirm: "1") : (student.persisted? ? student_path(student) : students_path),
+      class: "space-y-4" do |form| %>
+  <% if student.errors.any? %>
+    <div class="rounded-lg bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">
+      <p><%= t("errors.form") %></p>
+      <ul class="mt-1 list-disc list-inside">
+        <% student.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+    <div>
+      <%= form.label :name, class: "block text-sm font-semibold mb-1" %>
+      <%= form.text_field :name, required: true,
+            class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
+    </div>
+    <div>
+      <%= form.label :grade, class: "block text-sm font-semibold mb-1" %>
+      <%= form.text_field :grade, placeholder: t("students.form.grade_placeholder"),
+            class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <%= form.label :monthly_fee, class: "block text-sm font-semibold mb-1" %>
+        <%= form.number_field :monthly_fee, min: 0, step: 1000,
+              class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
+      </div>
+      <div>
+        <%= form.label :payment_day, class: "block text-sm font-semibold mb-1" %>
+        <%= form.number_field :payment_day, min: 1, max: 28,
+              class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <%= form.label :payment_type, class: "block text-sm font-semibold mb-1" %>
+        <%= form.select :payment_type, Student.payment_types.keys.map { |key| [ t("students.payment_type.#{key}"), key ] }, {},
+              class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
+      </div>
+      <% if student.persisted? %>
+        <div>
+          <%= form.label :status, class: "block text-sm font-semibold mb-1" %>
+          <%= form.select :status, Student.statuses.keys.map { |key| [ t("students.status.#{key}"), key ] }, {},
+                class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
+        </div>
+      <% end %>
+    </div>
+    <div>
+      <%= form.label :started_on, class: "block text-sm font-semibold mb-1" %>
+      <%= form.date_field :started_on,
+            class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
+    </div>
+    <div>
+      <%= form.label :memo, class: "block text-sm font-semibold mb-1" %>
+      <%= form.text_area :memo, rows: 2,
+            class: "w-full rounded-lg border border-slate-300 px-3 py-2 text-base" %>
+    </div>
+  </div>
+
+  <% guardian = student.guardians.first || student.guardians.build %>
+  <div class="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+    <p class="text-sm font-semibold"><%= t("students.form.guardian_section") %></p>
+    <%= fields_for "student[guardians_attributes][]", guardian do |guardian_form| %>
+      <%= guardian_form.hidden_field :id %>
+      <div>
+        <%= guardian_form.label :name, t("activerecord.attributes.guardian.name"),
+              class: "block text-sm font-semibold mb-1" %>
+        <%= guardian_form.text_field :name,
+              class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
+      </div>
+      <div>
+        <%= guardian_form.label :phone_number, t("activerecord.attributes.guardian.phone_number"),
+              class: "block text-sm font-semibold mb-1" %>
+        <%= guardian_form.telephone_field :phone_number, inputmode: "numeric",
+              placeholder: "01012345678",
+              class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
+      </div>
+    <% end %>
+    <% if guardian.errors.any? %>
+      <ul class="list-disc list-inside text-sm text-red-700">
+        <% guardian.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    <% end %>
+    <p class="text-xs text-slate-500"><%= t("students.form.phone_notice") %></p>
+  </div>
+
+  <div class="flex gap-2">
+    <%= form.submit t("common.save"),
+          class: "min-h-11 flex-1 rounded-lg bg-slate-900 text-white font-semibold text-sm" %>
+    <%= link_to t("common.cancel"), student.persisted? ? student_path(student) : students_path,
+          class: "min-h-11 px-4 flex items-center rounded-lg border border-slate-300 bg-white text-sm text-slate-700" %>
+  </div>
+<% end %>

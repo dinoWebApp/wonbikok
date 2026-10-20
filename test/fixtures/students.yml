@@ -1,0 +1,29 @@
+one:
+  tenant: one
+  name: 정재원
+  grade: 초3
+  monthly_fee: 250000
+  payment_day: 25
+  status: active
+
+paused_one:
+  tenant: one
+  name: 이서윤
+  grade: 초2
+  monthly_fee: 200000
+  payment_day: 10
+  status: paused
+  ended_on: 2026-10-01
+
+withdrawn_one:
+  tenant: one
+  name: 박도윤
+  status: withdrawn
+  ended_on: 2026-09-15
+
+other_tenant:
+  tenant: two
+  name: 최시우
+  monthly_fee: 300000
+  payment_day: 5
+  status: active
