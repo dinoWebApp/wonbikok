@@ -33,6 +33,7 @@ Rails 단일 앱 (Puma)
 
 - **Ruby 4.0.7** (mise/.ruby-version 고정), **Rails 8.1.4**
 - DB: SQLite3 (>= 2.1) — 개발/운영 동일, db/schema.rb 커밋 필수
+- 인증: bcrypt(has_secure_password) + Rails 8 세션 — 원장 식별자는 휴대폰번호(Active Record Encryption 암호화)
 - 웹서버 Puma + Thruster, 배포 Kamal 2 (config/deploy.yml)
 - 프론트: ERB + Hotwire (turbo-rails, stimulus-rails) + Tailwind CSS + Propshaft + importmap-rails (Node/npm 없음)
 - 캐시/큐/실시간: solid_cache / solid_queue / solid_cable (DB 기반)
@@ -140,11 +141,11 @@ bin/kamal deploy          # 프로덕션 배포 (git-deploy 스킬 절차 경유
 
 ## 구현 진행 상황 (로드맵)
 
-PRD.md 18장 로드맵 기준. 현재 구현된 기능 없음(하네스 구축 단계).
+PRD.md 18장 로드맵 기준. W1 완료(2026-10-20).
 
 | 단계 | 범위 | 상태 |
 |:---|:---|:---|
-| W1 | 온보딩·사업자 연동(F1), 원생 관리(F2) — 연습 모드 | ⬜ 미착수 |
+| W1 | 온보딩·사업자 연동(F1), 원생 관리(F2) — 연습 모드 | ✅ 완료 (2026-10-20, 리뷰 APPROVED·테스트 73건 통과·실행검증 통과) |
 | W2 | 월간 청구·납부 안내(F3), 솔라피 알림톡, 리마인더(F6) | ⬜ 미착수 |
 | W3 | 입금 확인(F4), 현금영수증(F5) + 학부모 청구 링크(F9) | ⬜ 미착수 |
 | W4 | 대시보드(F7), 구독·결제(F8), 관리자 핵심(A1·A2·A3·A5) | ⬜ 미착수 |
