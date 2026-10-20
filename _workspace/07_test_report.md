@@ -1,90 +1,88 @@
-# W1 테스트 보고서 — F1 온보딩 + F2 원생 관리 (Phase 7)
+# W2 테스트 보고서 — F3 월간 청구·솔라피 알림톡 + F6 미납 리마인더
 
-- 작성: wonbikok-tester (W1Test) / 2026-10-20
-- 대상: F1 온보딩·사업자 연동, F2 원생 관리(+ Phase 6 수정 전체)
-- 결과: **`bin/rails test` 72 runs, 256 assertions, 0 failures, 0 errors** / `bin/rubocop` 57 files **no offenses**
+- 담당: W2Test / 2026-10-20
+- 결과: **135 runs, 533 assertions, 1 failure + 1 error — 모두 코드 버그**(아래 참조), 테스트 오류 0
+- 품질 게이트: `bin/rubocop` 85 files **no offenses** / 기존 테스트 77건 회귀 0
 
-## 1. 실행 통계
+## 1. 통계
 
-| 항목 | 값 |
-|:---|:---|
-| 테스트 파일 | 10개 (models 4, services 2, controllers 4) |
-| 총 테스트 | 72건 / 256 assertions |
-| 통과 | 72 (100%) |
-| 실패 | 0 |
-| 코드 버그로 분류 | 2건 (아래 §3 — 테스트는 통과 형태로 작성, 버그는 보고만) |
-
-## 2. 발견·보고 이슈 (Developer 전달 — 임의 수정하지 않음)
-
-### [BUG-1] CSV 안내 문구 3건의 로케일 키 위치 오류 → "Translation missing" 표시
-- **증상**: `students.import.errors.no_file` / `expired` / `file_too_large` 3키가 ko.yml에서 `errors:` 하위가 아닌 한 단계 위(`students.import` 레벨, ko.yml 138~140행)에 위치. 컨트롤러는 `t("students.import.errors.*")`로 조회(students_controller.rb:74, 99, 121) → 실제 화면에 "Translation missing: ko.students.import.errors.file_too_large" 노출.
-- **영향**: 1MB 초과 차단(422)·오류내역 만료 안내·파일 미선택 안내가 모두 깨진 문구로 표시됨.
-- **분류**: 코드 버그(로케일 들여쓰기). **수정 제안**: 3키를 `errors:` 하위로 이동.
-- **테스트 처리**: 상태 코드·데이터 무변화 등 행동 계약만 단언하고 문구 단언은 제외(BUG-1 해소 후 문구 단언 추가 권장).
-
-### [BUG-2] 오류내역 키 없는 세션의 `/students/import/errors` 직접 접근 → ArgumentError 500
-- **증상**: `import_errors`가 `Rails.cache.read(session[:csv_import_errors_key].to_s)`(students_controller.rb:97)로 빈 문자열 키 조회 → MemoryStore/SolidCache 계열에서 `ArgumentError: key cannot be blank`. 재리뷰 보고의 "키 없는 직접 접근도 nil.to_s로 동일 분기 — 500 없음"은 :null_store에서만 성립. 프로덕션(solid_cache)에서는 만료 후·새 세션 직접 접근 시 500 화면.
-- **분류**: 코드 버그(경계 누락). **수정 제안**: `if (key = session[:csv_import_errors_key]).present?` 선행 후 만료 분기로 통일.
-- **테스트 처리**: 데이터 미노출 성질만 단언(BUG-2 경로 rescue). 재현: `test/controllers/students_controller_test.rb` "타 테넌트 세션으로 오류내역 키에 접근할 수 없다".
-
-### [관찰] 로그아웃이 cookie 세션의 `csv_import_errors_key`를 제거하지 않음
-- `clear_session`은 `:session_id` 쿠키만 삭제 → 같은 브라우저에서 로그아웃 후 다른 계정 로그인 시 이전 계정의 오류내역 키가 세션에 남아 캐시 내역 조회 가능(오류행 값은 원장 본인 입력값이라 유출 심각도 낮음). W2 `reset_session` 정비 시 병행 권장.
-
-## 3. Rule ID 커버리지
-
-| Rule ID | 시나리오 | 테스트 | 결과 |
-|:---|:---|:---|:---|
-| TEN-001 | 타 테넌트 원생 show/pause 404, 목록 타테넌트 데이터 부재, 오류내역 키 테넌트 분리·타세션 접근 차단, CSV 양식 실데이터 무포함 | students_controller_test 6건 | 통과 |
-| TEN-002 | 스키마상 주민번호 필드 부재(구조 확인 — 수집 경로 자체가 없어 별도 테스트 부재) | schema 검토 | 해당 없음(구조 보장) |
-| TEN-003 | Guardian/User DB 암호문 저장, phone_last4 자동 채움, masked_phone 형식, deterministic 조회, 번호 정규화 | guardian_test·user_test 6건 | 통과 |
-| INV-004 | Student.active 재원 전용, 전이 시 스코프 반영, ended_on 기록·복원 해제·최초일 보존 | student_test 5건 | 통과 |
-| PAY-DAY(경계) | 모델 1·28 통과/0·29 거절, CSV 28 통과/29 거절, 직접 POST 29 거절 | student_test·csv service·controller 3건 | 통과 |
-| WARNING-4 | 로그인 11회째 429 | sessions_controller_test | 통과 |
-| WARNING-5 | session 본문 누락 400, `q[]=` 배열 정상 처리, 파일 필드 문자열 422 | sessions·students controller test | 통과 |
-| WARNING-6 | 검증 우편 요청도 RecordNotUnique → "이미 가입된 휴대폰번호" 422 | registrations·user_test 2건 | 통과 |
-| WARNING-1/7 | 스텝 우회 차단(2스텝에서 4·5 GET/PATCH 리다이렉트), 사업자 빈값 422·정상 제출 진행 | onboarding_controller_test 2건 | 통과 |
-| CRITICAL-1/2, BLOCKER-1 | §4 참조 | — | 통과 |
-
-## 4. 리뷰어 전달 시나리오 9건 매핑
-
-| # | 리뷰어 시나리오 | 테스트 | 결과 |
-|:---|:---|:---|:---|
-| 1 | CRITICAL-2 step=1 재로그인 재개 400 아님·루트 재개·step=3 유지·완료자 미적용 | onboarding_controller_test 3건 | 통과 |
-| 2 | BLOCKER-1 CSV 대량 오류 + 캐시(만료 안내·타 테넌트 키 접근 불가) | students_controller_test 2건 + service 헤더오타 전행 오류(행번호 2·3 수집) + 1MB 20,000행 422 | 통과 (⚠️ 만료 분기는 MemoryStore 교체 방식으로 검증 — 리뷰어 메모 반영) |
-| 3 | CRITICAL-1/WARNING-8 CSV 중복(동일 파일 2회차 전행 오류·생성 0건, 형제 행 오류 전환 + 수동 경로 형제 등록 허용) | students_controller_test 2건 + csv service 2건 | 통과 |
-| 4 | WARNING-1/7 스텝 강제 + 사업자 빈값 422 | onboarding_controller_test 2건 | 통과 |
-| 5 | WARNING-2 납부일 일원화(29·31 거절, 28 통과) | student_test 2건 + service 1건 + controller POST 1건 (31은 29와 동일 검증 경로라 29로 대표) | 통과 |
-| 6 | TEN-001/003 회귀(404·마스킹·last4 검색·오류 CSV 타 데이터 부재) | students·guardian tests | 통과 |
-| 7 | WARNING-5/6 견고성 | sessions 1건 + students 2건 + registrations 1건 | 통과 |
-| 8 | WARNING-4 rate limit 429 | sessions_controller_test | 통과 (⚠️ test_helper에서 ActionController::Base.cache_store를 컨트롤러 로드 전 MemoryStore로 교체 — rate_limit은 부팅 시 store를 캡처하기 때문) |
-| 9 | INV-004 상태 전이 회귀 | student_test 5건 + controller 1건 | 통과 |
-
-## 5. 테스트 설계 메모 (재현성·제약)
-
-1. **fixtures 범위**: `tenants.yml`·`students.yml`만 사용. Guardian/User는 `encrypts` 컬럼이 있어 raw SQL로 삽입되는 fixtures가 평문을 남겨 `Decryption` 오류를 유발함을 실증 확인 → 모델 API로 생성하는 헬퍼(`create_owner_user`, `create_student_with_guardian`) 사용. 초기 프로브 잔재가 test DB에 남아 오류를 낸 건 `bin/rails db:test:prepare`로 정리함.
-2. **캐시 의존 기능**: CSV 오류내역 만료는 `with_memory_cache`(테스트 블록 내 Rails.cache 교체·ensure 복원), rate limit은 부팅 전 store 교체로 각각 검증 — test env `:null_store` 제약 회피.
-3. **RecordNotUnique 재현**: 검증 우회용 `valid?` 치환이 필요하여 alias + ensure 복원 패턴 사용(registrations_controller_test, user_test).
-4. 테스트 간 독립성: transactional fixtures 기본, 순서 의존 없음(parallel workers 간 DB 분리 확인).
-
-## 6. 결론
-
-- 리뷰어 시나리오 9건 전부 커버, 전체 스위트 그린. 산출 테스트만으로 품질 게이트(`bin/rails test` + `bin/rubocop`) 통과.
-- **코드 버그 2건(BUG-1 로케일 키 위치, BUG-2 빈 캐시 키 500) + 관찰 1건(로그아웃 시 세션 키 잔존)** 을 Developer 전달 필요 — 본 Tester는 수정하지 않음(프로토콜 준수).
-
----
-
-# Phase 6-3 수정 후 재실행 — BUG-1·BUG-2 픽스 검증 (W1Fix3Dev / 2026-10-20)
-
-- 수정: BUG-1 ko.yml 3키 `students.import.errors:` 하위 이동 / BUG-2 `import_errors` 키 blank 가드(만료 경로 재사용)
-- 결과: **`bin/rails test` 73 runs(+1), 285 assertions(+29), 0 failures, 0 errors** / `bin/rubocop` 57 files no offenses / `bin/brakeman` no warnings
-
-| 항목 | 이전(Phase 7) | 수정 후 |
+| 구분 | 파일 | 테스트 |
 |:---|:---|:---|
-| 총 테스트 | 72 / 256 assertions | **73 / 285 assertions** |
-| 실패·에러 | 0 | 0 |
+| 모델 | test/models/invoice_test.rb | 10 (INV-001/002/003/004/006, TEN-004) |
+| 모델 | test/models/message_log_test.rb | 7 (MSG-001, MSG-007) |
+| 서비스 | test/services/notifications_dispatcher_test.rb | 8 (MSG-001/007, C5) |
+| 서비스 | test/services/reminders_scheduler_test.rb | 14 (C2 회귀, MSG-004/006, INV-003) |
+| 잡 | test/jobs/message_send_job_test.rb | 9 (MSG-002/003, C4, SIMULATED) |
+| 잡 | test/jobs/monthly_invoice_generation_job_test.rb | 2 (멱등, C3 크론 회귀) |
+| 통합 | test/integration/w2_invoices_flow_test.rb | 8 (TEN-001, 게이트, INV-002/006, C4/C5, W10, MSG-007) |
 
-## 회귀 테스트 상세
+공용: test/test_helper.rb에 `create_owner_user`(name 인자 추가)·`create_invoice` 헬퍼 추가. 외부 API는 `FakeSolapiClient`(호출 카운터) + `Solapi::Client.from_credentials` 싱글턴 교체로 **실호출 0**.
 
-1. **BUG-1 고정**: 1MB 초과 422·파일 문자열 변조 422·파일 미선택 422 응답에 `Translation missing` 부재 + 정상 안내 문구("파일이 너무 큽니다" / "CSV 파일을 선택해 주세요") 노출 단언 추가. 만료 리다이렉트 후 안내 문구("오류 내역이 만료되었거나 없습니다") 노출 단언 추가 — failing-before/passing-after 확인(수정 전 3경로 모두 Translation missing 노출).
-2. **BUG-2 고정**: 신규 테스트 "오류내역 키가 없는 세션의 직접 접근은 500이 아닌 만료 안내 리다이렉트다" — 수정 전 `Rails.cache.read("")` ArgumentError 500 재현 경로, 수정 후 302 리다이렉트·안내 문구 확인. 기존 "타 테넌트 세션" 테스트의 `rescue ArgumentError` 버그 우회 제거하고 리다이렉트 단언으로 교체.
-3. **관찰 1건(로그아웃 시 `csv_import_errors_key` 잔존)**: 지시대로 미수정 — 03_implementation.md 열린 이슈에 W2 과제(`reset_session` 정비 시 병행)로 기록.
+## 2. 발견 코드 버그 (수정 없이 보고 — Developer 전달 필요)
+
+### 버그 1 [MSG-003 위반] 재시도 상한 1회가 실제로는 2회 — app/jobs/message_send_job.rb:71
+`handle_retry_or_fail`의 조건이 `executions <= MAX_AUTO_RETRIES(1)`. ActiveJob은 재시도 시점에 executions를 증가시키므로 **2차 실행(executions=1)에서도 재시도가 큐에 등록**되고, 3차(executions=2)에야 FAILED 확정 → 초기 발송 + 자동 재시도 2회. PRD MSG-003 "재시도 상한 1회" 및 리뷰 검증표("executions <= 1 → 1회")와 불일치(리뷰어 판정 오류로 추정).
+- 재현: test/jobs/message_send_job_test.rb "MSG-003 2차 실패 후에는 재시도 없다" — NETWORK_ERROR 스텁, executions=1로 실행 시 재시도 잡 1건이 추가로 큐에 등록됨(failure).
+- 수정 제안: `executions < MAX_AUTO_RETRIES` (executions=0만 재시도).
+
+### 버그 2 [INV-002 500 오류] 수정 실패(사유 누락 422) 재렌더 시 서버 오류 — app/views/invoices/edit.html.erb:36
+`f.text_field :change_reason`인데 Invoice에 `change_reason` 속성(컬럼/가상 어트리뷰트)이 없음. 정상 경로(DRAFT 편집)에서는 `@needs_change_reason=false`로 필드가 렌더되지 않아 발견되지 않았으나, **READY 청구를 사유 없이 수정해 422로 `render :edit` 되는 순간 ActionView::Template::Error(500)** 발생. INV-002 사유 필수 UX가 실제로는 동작 불가.
+- 재현: test/integration/w2_invoices_flow_test.rb "INV-002 READY 청구 수정은 사유 없이 422..." — 두 번째 patch(사유 있음) 도달 전 첫 422 렌더에서 에러(error).
+- 수정 제안: Invoice에 `attr_accessor :change_reason` 추가 또는 뷰를 `text_field_tag :invoice[change_reason]`로 변경.
+
+## 3. 리뷰어 시나리오 10건 매핑
+
+| # | 시나리오 | 테스트 | 결과 |
+|:--|:---|:---|:---|
+| 1 | MSG-001 동시성(partial unique + duplicated) | message_log_test(인덱스·우회 삽입), dispatcher_test(RecordNotUnique 흡수·resend 예외) | ✅ |
+| 2 | F6 단계 타이밍 경계값 | reminders_scheduler_test(1·2일 nil, 3·6일 d3, 7일 d7, 월말 D-1, month_end 흡수) | ✅ (C2 수정분 회귀 확인) |
+| 3 | 취소 상호작용 | invoice_test(연쇄 차단), message_send_job_test(INVOICE_CANCELLED 가드), w2_invoices_flow_test(재발송 차단) | ✅ |
+| 4 | 수신처 부재 → SENT 미전이 | dispatcher_test(missing 집계·dispatched ids), w2_invoices_flow_test(C5) | ✅ |
+| 5 | MSG-003 재시도 상한 | message_send_job_test 3건 | ❌ **버그 1** |
+| 6 | 배치 등록(크론)·멱등 | monthly_invoice_generation_job_test(Fugit::Cron 전건, 재실행 created=0) | ✅ |
+| 7 | INV-006 경계 | invoice_test(SENT·CANCELLED 조정 차단, DRAFT 자유), w2_invoices_flow_test | ✅ |
+| 8 | cancel 빈 사유 422 | invoice_test(errors.add+false), 통합 cancel 404 격리 | ✅ |
+| 9 | W1 회귀(게이트) | w2_invoices_flow_test(온보딩 게이트 3경로) | ✅ |
+| 10 | SIMULATED 격리 | message_send_job_test(practice 0호출 카운터) | ✅ |
+
+## 4. Rule ID 커버리지
+
+| Rule ID | 검증 내용 | 상태 |
+|:---|:---|:---|
+| INV-001 | 모델 검증 + DB 유니크(우회 삽입 RecordNotUnique) + Generator 멱등 skip | ✅ |
+| INV-002 | READY 조정 사유 필수 + change_history 기록 / DRAFT 무사유 | ⚠️ 로직은 통과, 재렌더 500 = 버그 2 |
+| INV-003 | billable·remindable·sendable 제외 + 취소 시 QUEUED 연쇄 FAILED + 잡 가드 | ✅ |
+| INV-004 | paused 제외(excluded=1), active만 생성 | ✅ |
+| INV-006 | DRAFT→READY confirm 전제, SENT/CANCELLED 조정 차단 | ✅ |
+| MSG-001 | 모델 검증 + partial unique 인덱스(where절 포함) + RecordNotUnique duplicated + resend_of 예외·resends 연결 + 단계별 유일성 + 배치 재실행 멱등 | ✅ |
+| MSG-002 | fallback:true 응답 → FALLBACK_SENT 기록 + 청구 SENT | ✅ |
+| MSG-003 | 1차 실패 재시도 1회 / ConfigError 0회 | ❌ 버그 1 |
+| MSG-004 | 제외 토글 직후 배치 대상 탈락 | ✅ |
+| MSG-006 | 08시→당일 9시, 야간 22시→익일 9시, 23시 설정→17시 클램프 | ✅ |
+| MSG-007 | QUEUED만 취소, 예약 등록→취소(로그 제거·READY 복귀), 무효 시각 즉시발송 변질 차단(W10) | ✅ |
+| TEN-001 | 타 테넌트 invoice 조회·취소·재발송·예약취소 전부 404 + 로그 보존 | ✅ |
+| TEN-004 | 원생 이름·원비 변경 후 스냅샷 불변 | ✅ |
+
+## 5. Phase 6 수정분(C1~C5) 검증 결과
+
+| 항목 | 검증 | 결과 |
+|:---|:---|:---|
+| C1 partial unique 인덱스 | 인덱스 존재(where "resend_of_id IS NULL") + 우회 삽입 차단 + Dispatcher rescue | ✅ |
+| C2 d3 경계 | 경과 1·2일 nil / 3일 d3 / 6일 d3 / 7일 d7 | ✅ |
+| C3 크론 등록 | recurring.yml 전 schedule Fugit::Cron 파싱 | ✅ |
+| C4 취소 발송 차단 | 잡 가드 FAILED(INVOICE_CANCELLED)·클라이언트 0호출, cancel! 연쇄, resend 차단 | ✅ |
+| C5 SENT 선반영 제거 | 수신처 없는 건 READY 유지 + missing 집계 + dispatched ids만 전이 | ✅ |
+
+## 6. 실패 원인 분류 요약
+
+- 1 failure + 1 error: **모두 코드 버그**(§2) — 테스트 오류·플레이크 0. 해당 2개 테스트는 버그 수정 후 즉시 통과되도록 규칙 기준으로 작성됨(수정 시 테스트 변경 불요).
+
+## Phase 6-2 수정 후 재실행 (W2Fix2Dev / 2026-10-20)
+
+| 항목 | 수정 | 재검증 |
+|:---|:---|:---|
+| 버그 1 [MSG-003] | message_send_job.rb:89 — `executions <= MAX_AUTO_RETRIES` → `executions <` (executions=0만 재시도) | ✅ "MSG-003 2차 실패 후에는 재시도가 없다" 통과 — 2차 실패에서 재시도 잡 0건, FAILED/NETWORK_ERROR 확정 |
+| 버그 2 [INV-002] | invoice.rb — `attr_accessor :change_reason` 추가(가상 어트리뷰트, 컨트롤러 invoice_params[:change_reason] 경로와 정합) | ✅ "INV-002 READY 청구 수정은 사유 없이 422, 사유와 함께 성공한다" 통과 — 422 재렌더 Template::Error 소멸 |
+
+- 결과: **135 runs, 541 assertions, 0 failures, 0 errors** — 테스트 파일 변경 없음
+- 품질 게이트: `bin/rubocop` 85 files no offenses / `bin/brakeman` No warnings found
