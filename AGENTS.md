@@ -1,6 +1,6 @@
 # AGENTS.md
 
-이 파일은 omp 에이전트가 이 저장소에서 작업할 때 참고할 가이드입니다.
+이 파일은 ZCode Agent와 원비콕 하네스 서브에이전트가 이 저장소에서 작업할 때 참고할 가이드입니다.
 
 ---
 
@@ -120,24 +120,26 @@ bin/kamal deploy          # 프로덕션 배포 (git-deploy 스킬 절차 경유
 
 **목표:** PRD 비즈니스 규칙과 AGENTS.md 아키텍처를 준수하는 코드의 구현·리뷰·테스트를 자동화한다.
 
-**트리거:** 아래에 해당하는 모든 요청은 반드시 `wonbikok-orchestrator` 스킬을 사용하라:
-- 기능 구현, 코드 수정, 리팩터링, 버그 수정
-- 코드 리뷰, 테스트 작성, 디버깅
-- 마이그레이션, 모델/컨트롤러/뷰 설계, 비즈니스 로직 검증
-- 외부 연동(포트원·솔라피) 구현
-- 위 작업의 후속 요청 (수정, 보완, 개선, 리팩터링, 재실행, 업데이트)
+**진입점:** 아래에 해당하는 모든 요청은 오케스트레이터 명령어로 실행한다:
+- 일반 모드: `/wonbikok_orchestrator {요청}` — 메인 GLM-5.3 + 일반 프로필(wonbikok-developer/reviewer/tester)
+- 절약 모드: `/wonbikok_orchestrator_lite {요청}` — 메인 GLM-5.3-Flash + lite 프로필(-developer-lite/-reviewer-lite/-tester-lite)
+- 대상: 기능 구현, 코드 수정, 리팩터링, 버그 수정, 코드 리뷰, 테스트 작성, 디버깅, 마이그레이션, 모델/컨트롤러/뷰 설계, 비즈니스 로직 검증, 외부 연동(포트원·솔라피) 구현
+- 위 작업의 후속 요청 (수정, 보완, 개선, 리팩터링, 재실행, 업데이트)도 동일 명령어로 처리
 
 단, 순수한 문서 내용 확인 질문("~가 무슨 뜻이야?")은 직접 응답 가능.
 
-**배포:** "git 배포", "커밋", "푸시", "배포", "push", "kamal 배포" 요청 시 `wonbikok-git-deploy` 스킬을 사용하라.
+**승인 게이트:** 오케스트레이터는 플랜 요약 보고 후 턴을 종료하고 사용자 승인을 기다린다. **승인 전 어떤 Developer/Reviewer/Tester 서브에이전트도 호출하지 않는다.** 승인 후에는 재승인 없이 파이프라인을 자동 진행한다.
 
-**하네스 구성 요소:** 에이전트는 `.omp/agents/` (wonbikok-developer/reviewer/tester), 스킬은 `.omp/skills/`, 진행 상태는 `.omp/progress.json`, 산출물은 `_workspace/`.
+**배포:** "git 배포", "커밋", "푸시", "배포", "push", "kamal 배포" 요청 시 `$wonbikok-git-deploy` 스킬을 사용하라.
+
+**하네스 구성 요소:** 명령어는 `.zcode/commands/`(일반·절약 2개), 워크플로우·참조 스킬은 `.zcode/skills/`, 서브에이전트 프로필 6개(일반+lite)는 `.zcode/agents/`, 진행 상태는 `.zcode/progress.json`, 산출물은 `_workspace/`. 구성 규약은 HARNESS_CONVENTION.md (v4.0.3, ZCode Desktop 기준).
 
 **변경 이력:**
 
 | 날짜 | 변경 내용 | 대상 | 사유 |
 |------|----------|------|------|
 | 2026-10-20 | 초기 하네스 구성 | 전체 | 신규 구축 (HARNESS_CONVENTION v3.2.0 기준) |
+| 2026-10-29 | omp→ZCode 하네스 전환 | 전체 | ZCode Desktop 런타임 이전 (HARNESS_CONVENTION v4.0.3 기준) |
 
 ## 구현 진행 상황 (로드맵)
 
@@ -150,4 +152,4 @@ PRD.md 18장 로드맵 기준. W1·W2 완료(2026-10-20/21).
 | W3 | 입금 확인(F4), 현금영수증(F5) + 학부모 청구 링크(F9) | ⬜ 미착수 |
 | W4 | 대시보드(F7), 구독·결제(F8), 관리자 핵심(A1·A2·A3·A5) | ⬜ 미착수 |
 
-작업 재개 가이드: `.omp/progress.json`의 currentPhase 확인 → `awaiting_approval`이면 플랜(01_plan.md) 재요약 후 승인 대기 → 이외에는 해당 Phase부터 재개. 상세는 HARNESS_CONVENTION.md §8.2.
+작업 재개 가이드: `.zcode/progress.json`의 currentPhase 확인 → `awaiting_approval`이면 플랜(01_plan.md) 재요약 후 승인 대기 → 이외에는 해당 Phase부터 재개. 상세는 HARNESS_CONVENTION.md §8.2.

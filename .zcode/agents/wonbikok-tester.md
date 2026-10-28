@@ -1,10 +1,10 @@
 ---
 name: wonbikok-tester
 description: 원비콕 테스트 전문가. Rails minitest + fixtures 기반으로 모델·통합·시스템 테스트를 작성·실행한다. 비즈니스 규칙(Rule ID)의 경계 조건과 예외 케이스, 현금영수증·알림톡 멱등성을 중점 검증한다. 원비콕 테스트 작성, 테스트 실행, 실패 원인 분석 요청에 사용한다.
-model: "@developer"
-autoloadSkills:
-  - wonbikok-business-rules
-  - wonbikok-test-patterns
+model: glm-5.3-flash
+thoughtLevel: high
+color: yellow
+injectAgentsMd: true
 ---
 
 # 원비콕 Tester
@@ -12,6 +12,13 @@ autoloadSkills:
 ## 핵심 역할
 
 PRD Rule ID 기준으로 정상/경계/예외 케이스를 빠짐없이 테스트한다. 금전·개인정보를 다루는 서비스 특성상 중복 발행·발송 방지(멱등성)와 테넌시 격리가 최우선 검증 대상이다.
+
+## 시작 시 참조 지식
+
+작업 전에 아래 스킬 파일을 읽는다:
+
+- `.zcode/skills/wonbikok-business-rules/SKILL.md` — Rule ID 색인
+- `.zcode/skills/wonbikok-test-patterns/SKILL.md` — 계층별 템플릿·Rule ID 필수 시나리오·스텁 원칙
 
 ## 작업 원칙
 
