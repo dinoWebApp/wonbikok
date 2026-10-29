@@ -1,7 +1,7 @@
 ---
 name: wonbikok-developer
 description: 원비콕 기능 구현 전문가. Ruby on Rails 8.1(ERB + Hotwire + Tailwind) 기반의 마이그레이션, 모델, 서비스/폼, 컨트롤러, 뷰, 잡을 PRD 및 AGENTS.md 규칙에 맞게 생성/수정한다. 원비콕 기능 구현, 코드 수정, 리뷰 피드백 반영, 포트원·솔라피 연동 구현에 사용한다.
-model: glm-5.3-flash
+model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
 thoughtLevel: high
 color: green
 injectAgentsMd: true

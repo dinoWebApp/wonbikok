@@ -21,6 +21,11 @@ description: 원비콕 개발 오케스트레이터. 신규 기능 구현, 코�
 6. **Rule ID 필수**: 비즈니스 로직 구현·리뷰·테스트 지시에는 PRD.md 22장의 Rule ID를 반드시 포함·인용한다.
 7. **품질 게이트**: 커밋 전 `bin/rubocop`(0 에러) + `bin/brakeman`(0 경고) + `bin/rails test`(통과). 테스트에서 포트원·솔라피 실호출 금지.
 8. **상태 기록**: 서브에이전트 결과 수신 직후 첫 도구 호출로 `.zcode/progress.json`과 세션 todo를 세트 갱신한다(다음 스폰·검증보다 먼저).
+9. **위임 실측**: Phase 3·5·7에서 서브에이전트 스폰 직후 모델 I/O 로그로 스폰된 프로필·모델·추론 수준(effort)이 정의와 일치하는지 실측해 `_workspace/00_delegation_log.md`에 한 줄 기록한다. model-io 로그는 임시 파일이므로 **스폰 직후 측정이 필수**다:
+   ```bash
+   grep -o '"effort":"[a-z]*"' ~/.zcode/cli/rollout/model-io-sess_subagent_agent_*.jsonl | sort | uniq -c
+   ```
+   정의한 `thoughtLevel`과 다르면 frontmatter `model`이 탈락한 것이다(규약 §1.4 제약 3 — bare 이름 금지). 불일치 시 자동 재위임하지 않고 기록 후 최종 보고에 명시한다.
 
 ## 프로필 선택 (모드별 유일한 분기점)
 
@@ -69,7 +74,7 @@ PRD.md(기능 명세·Rule ID·에러·데이터 모델)와 AGENTS.md(진행 상
 
 ## Phase 3: 구현 (Developer 위임)
 
-Agent 도구로 Developer 프로필 호출. 지시에 PRD 섹션·Rule ID·출력 파일 명시. 산출물: 소스 + `_workspace/03_implementation.md`.
+Agent 도구로 Developer 프로필 호출. 지시에 PRD 섹션·Rule ID·출력 파일 명시. 산출물: 소스 + `_workspace/03_implementation.md`. 스폰 직후 위임 실측(하드 룰 9)을 수행한다.
 
 ## Phase 4: 코드 정리 (오케스트레이터 직접)
 
@@ -85,7 +90,7 @@ bin/rails test                   # 컴파일/로딩 검증 겸용
 
 ## Phase 5: 코드 리뷰 (Reviewer 위임)
 
-Agent 도구로 Reviewer 프로필 호출(읽기 전용). 산출물: `_workspace/05_review.md`.
+Agent 도구로 Reviewer 프로필 호출(읽기 전용). 산출물: `_workspace/05_review.md`. 스폰 직후 위임 실측(하드 룰 9)을 수행한다.
 - `APPROVED` → Phase 7
 - `CRITICAL/WARNING` → Phase 6 수정 후 Phase 7
 - `BLOCKER` → Phase 6 수정 후 Phase 5 재리뷰 (5→6→5 루프 최대 2회, 초과 시 사용자 중재)
@@ -96,7 +101,7 @@ Reviewer 지적 사항만 최소 수정. `_workspace/05_review.md`를 위임 프
 
 ## Phase 7: 테스트 (Tester 위임)
 
-Agent 도구로 Tester 프로필 호출. 산출물: `_workspace/07_test_report.md`.
+Agent 도구로 Tester 프로필 호출. 산출물: `_workspace/07_test_report.md`. 스폰 직후 위임 실측(하드 룰 9)을 수행한다.
 - 전부 통과 → Phase 8
 - 실패(코드 버그) → Phase 6
 - 실패(테스트 오류) → Tester 재위임
@@ -107,14 +112,14 @@ Agent 도구로 Tester 프로필 호출. 산출물: `_workspace/07_test_report.m
 
 ## Phase 9: 완료 보고 (오케스트레이터)
 
-1. 최종 보고: 실행 모드(일반/절약)와 호출 프로필, 변경 파일, 리뷰 결과, 테스트 결과, 실행 검증, 잔여 위험.
+1. 최종 보고: 실행 모드(일반/절약)와 호출 프로필, 변경 파일, 리뷰 결과, 테스트 결과, 실행 검증, 위임 실측 불일치 여부(00_delegation_log.md), 잔여 위험.
 2. AGENTS.md 구현 진행 상황 표 갱신.
 3. `.zcode/progress.json` 리셋(`currentPhase: null`).
 4. Git 커밋은 `$wonbikok-git-deploy` 스킬 절차(품질 게이트 + 사용자 확인)로 수행함을 안내.
 
 ## 데이터 흐름
 
-Phase 간 데이터는 `_workspace/` 파일(01→03→05→07→08)로 전달한다. 서브에이전트는 격리된 컨텍스트에서 실행되므로 위임 프롬프트에 필요한 맥락을 명시적으로 포함한다.
+Phase 간 데이터는 `_workspace/` 파일(00→01→03→05→07→08)로 전달한다. `00_delegation_log.md`는 Phase 3·5·7 위임 실측 기록이며 작업 단위로 함께 로테이션된다. 서브에이전트는 격리된 컨텍스트에서 실행되므로 위임 프롬프트에 필요한 맥락을 명시적으로 포함한다.
 
 ## 에러 핸들링
 

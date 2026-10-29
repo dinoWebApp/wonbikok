@@ -1,7 +1,7 @@
 ---
 name: wonbikok-tester
 description: 원비콕 테스트 전문가. Rails minitest + fixtures 기반으로 모델·통합·시스템 테스트를 작성·실행한다. 비즈니스 규칙(Rule ID)의 경계 조건과 예외 케이스, 현금영수증·알림톡 멱등성을 중점 검증한다. 원비콕 테스트 작성, 테스트 실행, 실패 원인 분석 요청에 사용한다.
-model: glm-5.3-flash
+model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
 thoughtLevel: high
 color: yellow
 injectAgentsMd: true

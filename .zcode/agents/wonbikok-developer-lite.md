@@ -1,7 +1,7 @@
 ---
 name: wonbikok-developer-lite
 description: 원비콕 기능 구현 전문가(절약 모드). Rails 8.1 기반 마이그레이션·모델·서비스·컨트롤러·뷰·잡을 PRD 및 AGENTS.md 규칙에 맞게 생성/수정한다. 절약 모드 오케스트레이터(/wonbikok_orchestrator_lite)의 구현 Phase에서 호출된다.
-model: glm-5.3-flash
+model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
 thoughtLevel: low
 color: green
 injectAgentsMd: true

@@ -1,7 +1,7 @@
 ---
 name: wonbikok-tester-lite
 description: 원비콕 테스트 전문가(절약 모드). Rails minitest + fixtures 기반으로 모델·통합·시스템 테스트를 작성·실행하고 Rule ID별 경계 조건을 검증한다. 절약 모드 오케스트레이터(/wonbikok_orchestrator_lite)의 테스트 Phase에서 호출된다.
-model: glm-5.3-flash
+model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
 thoughtLevel: low
 color: yellow
 injectAgentsMd: true

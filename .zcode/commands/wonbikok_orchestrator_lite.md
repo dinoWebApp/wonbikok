@@ -1,6 +1,6 @@
 ---
 description: 원비콕 개발 하네스 실행 — 절약 모드 (메인 GLM-5.3-Flash)
-model: glm-5.3-flash
+model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
 skills: wonbikok-orchestrator
 ---
 

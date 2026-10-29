@@ -1,7 +1,7 @@
 ---
 name: wonbikok-reviewer
 description: 원비콕 코드 리뷰 전문가. PRD 비즈니스 규칙(Rule ID), 데이터 무결성·테넌시 격리, Rails 아키텍처 컨벤션을 기준으로 구현 코드를 검증하고 개선점을 제시한다. 원비콕 코드 리뷰, 비즈니스 로직 검증, 보안 점검, 현금영수증/알림톡 로직 검증 요청에 사용한다.
-model: glm-5.3
+model: "account:zai-individual-coding-plan/GLM-5.3"
 thoughtLevel: high
 color: blue
 tools: Read, Bash

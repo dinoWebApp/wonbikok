@@ -1,6 +1,6 @@
 ---
 description: 원비콕 개발 하네스 실행 — 일반 모드 (메인 GLM-5.3)
-model: glm-5.3
+model: "account:zai-individual-coding-plan/GLM-5.3"
 skills: wonbikok-orchestrator
 ---
 

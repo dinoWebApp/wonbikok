@@ -1,7 +1,7 @@
 ---
 name: wonbikok-reviewer-lite
 description: 원비콕 코드 리뷰 전문가(절약 모드). PRD 비즈니스 규칙(Rule ID), 데이터 무결성·테넌시 격리, 아키텍처 컨벤션 기준으로 구현 코드를 검증한다. 절약 모드 오케스트레이터(/wonbikok_orchestrator_lite)의 리뷰 Phase에서 호출된다.
-model: glm-5.3-flash
+model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
 thoughtLevel: high
 color: blue
 tools: Read, Bash
