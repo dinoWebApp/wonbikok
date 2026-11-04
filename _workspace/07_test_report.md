@@ -1,88 +1,122 @@
-# W2 테스트 보고서 — F3 월간 청구·솔라피 알림톡 + F6 미납 리마인더
+# 07 테스트 보고: 랜딩페이지 + 전체 퍼블리싱 리디자인 (Phase 7, 2026-11-04)
 
-- 담당: W2Test / 2026-10-20
-- 결과: **135 runs, 533 assertions, 1 failure + 1 error — 모두 코드 버그**(아래 참조), 테스트 오류 0
-- 품질 게이트: `bin/rubocop` 85 files **no offenses** / 기존 테스트 77건 회귀 0
+> Tester(wonbikok-tester) 산출 — Rails 8.1 minitest + fixtures, 시스템 테스트는 본 Phase부터 도입.
 
-## 1. 통계
+## 총평: **PASS** — 신규 39건 + 기존 135건 전부 통과, 코드 버그 0건
 
-| 구분 | 파일 | 테스트 |
-|:---|:---|:---|
-| 모델 | test/models/invoice_test.rb | 10 (INV-001/002/003/004/006, TEN-004) |
-| 모델 | test/models/message_log_test.rb | 7 (MSG-001, MSG-007) |
-| 서비스 | test/services/notifications_dispatcher_test.rb | 8 (MSG-001/007, C5) |
-| 서비스 | test/services/reminders_scheduler_test.rb | 14 (C2 회귀, MSG-004/006, INV-003) |
-| 잡 | test/jobs/message_send_job_test.rb | 9 (MSG-002/003, C4, SIMULATED) |
-| 잡 | test/jobs/monthly_invoice_generation_job_test.rb | 2 (멱등, C3 크론 회귀) |
-| 통합 | test/integration/w2_invoices_flow_test.rb | 8 (TEN-001, 게이트, INV-002/006, C4/C5, W10, MSG-007) |
+| 게이트 | 결과 |
+|:---|:---|
+| `bin/rails test` (기본 러너 — system 제외) | **170 runs, 734 assertions, 0 failures, 0 errors, 0 skips** |
+| `bin/rails test:system` | **4 runs, 11 assertions, 0 failures, 0 errors, 0 skips** |
+| 합계 (기존 135 + 신규 39) | **174 runs, 745 assertions — 전부 통과** |
+| `bin/rubocop` | 94 files inspected, **no offenses** |
 
-공용: test/test_helper.rb에 `create_owner_user`(name 인자 추가)·`create_invoice` 헬퍼 추가. 외부 API는 `FakeSolapiClient`(호출 카운터) + `Solapi::Client.from_credentials` 싱글턴 교체로 **실호출 0**.
+베이스라인(작성 전) 135건 통과 확인 후 신규 테스트를 추가했으며, 기존 테스트 135건 회귀 0건. **이번 Phase에서 기존 테스트 파일 수정 없음** (Phase 3-B에서 기계적 치환된 3파일 그대로 통과).
 
-## 2. 발견 코드 버그 (수정 없이 보고 — Developer 전달 필요)
+## 1. 신규 테스트 목록 (39건)
 
-### 버그 1 [MSG-003 위반] 재시도 상한 1회가 실제로는 2회 — app/jobs/message_send_job.rb:71
-`handle_retry_or_fail`의 조건이 `executions <= MAX_AUTO_RETRIES(1)`. ActiveJob은 재시도 시점에 executions를 증가시키므로 **2차 실행(executions=1)에서도 재시도가 큐에 등록**되고, 3차(executions=2)에야 FAILED 확정 → 초기 발송 + 자동 재시도 2회. PRD MSG-003 "재시도 상한 1회" 및 리뷰 검증표("executions <= 1 → 1회")와 불일치(리뷰어 판정 오류로 추정).
-- 재현: test/jobs/message_send_job_test.rb "MSG-003 2차 실패 후에는 재시도 없다" — NETWORK_ERROR 스텁, executions=1로 실행 시 재시도 잡 1건이 추가로 큐에 등록됨(failure).
-- 수정 제안: `executions < MAX_AUTO_RETRIES` (executions=0만 재시도).
+### `test/models/beta_application_test.rb` — 17 tests / 63 assertions
 
-### 버그 2 [INV-002 500 오류] 수정 실패(사유 누락 422) 재렌더 시 서버 오류 — app/views/invoices/edit.html.erb:36
-`f.text_field :change_reason`인데 Invoice에 `change_reason` 속성(컬럼/가상 어트리뷰트)이 없음. 정상 경로(DRAFT 편집)에서는 `@needs_change_reason=false`로 필드가 렌더되지 않아 발견되지 않았으나, **READY 청구를 사유 없이 수정해 422로 `render :edit` 되는 순간 ActionView::Template::Error(500)** 발생. INV-002 사유 필수 UX가 실제로는 동작 불가.
-- 재현: test/integration/w2_invoices_flow_test.rb "INV-002 READY 청구 수정은 사유 없이 422..." — 두 번째 patch(사유 있음) 도달 전 첫 422 렌더에서 에러(error).
-- 수정 제안: Invoice에 `attr_accessor :change_reason` 추가 또는 뷰를 `text_field_tag :invoice[change_reason]`로 변경.
+fixtures 미사용(암호화 컬럼 — 모델 API 생성, test_helper의 create_owner_user 선례 준수).
 
-## 3. 리뷰어 시나리오 10건 매핑
+| 테스트 | Rule ID / 근거 |
+|:---|:---|
+| 필수 항목만으로 생성 가능 | 13.6 정상 |
+| marketing_agreed 기본 false | 13.6 (마케팅 수신 선택·분리) |
+| marketing_agreed true + 선택 3항목 저장 | 13.6 정상 |
+| 필수 항목 누락별 무효 (name·title·contact_type·contact_value·academy_type·terms_agreed=false) | 13.6 예외 |
+| 정의되지 않은 키(title/contact_type/academy_type) 무효 | 13.6 예외 |
+| 원생 수 구간 잘못된 키 무효 + 빈 값 허용(선택) | 13.6 경계 |
+| 이메일 형식 오류 3종 무효 | 13.6 예외 |
+| 전화 형식 오류 3종 무효 | 13.6 예외 |
+| 전화 하이픈·공백 정규화 저장 | 정규화 (User 선례) |
+| 이메일 좌우 공백 제거 | 정규화 |
+| **TEN-003** DB에 암호문 저장 (raw SQL로 평문 부재 확인) | TEN-003 |
+| **TEN-003** 저장값 평문 복원 | TEN-003 |
+| **TEN-003** deterministic 동등 조회 with_contact (타 이메일·타 수단 미조회) | TEN-003 / 13.6 중복 감지 |
+| 동일 연락처 두 번째 create! → **RecordNotUnique** (유니크 인덱스 — 동시 제출 경합 방어) | WARNING-2 반영 검증 |
+| 다른 연락처는 생성 가능 | 유니크 경계 |
+| **TEN-002** 금지 컬럼 부재 (resident_number/ssn/birth_date/ip_address/user_agent/referrer) | TEN-002 |
+| **TEN-002** 수집 컬럼 = 13.6 폼 항목 정확 일치 (초과 수집 없음) | TEN-002 / TEN-006 |
 
-| # | 시나리오 | 테스트 | 결과 |
-|:--|:---|:---|:---|
-| 1 | MSG-001 동시성(partial unique + duplicated) | message_log_test(인덱스·우회 삽입), dispatcher_test(RecordNotUnique 흡수·resend 예외) | ✅ |
-| 2 | F6 단계 타이밍 경계값 | reminders_scheduler_test(1·2일 nil, 3·6일 d3, 7일 d7, 월말 D-1, month_end 흡수) | ✅ (C2 수정분 회귀 확인) |
-| 3 | 취소 상호작용 | invoice_test(연쇄 차단), message_send_job_test(INVOICE_CANCELLED 가드), w2_invoices_flow_test(재발송 차단) | ✅ |
-| 4 | 수신처 부재 → SENT 미전이 | dispatcher_test(missing 집계·dispatched ids), w2_invoices_flow_test(C5) | ✅ |
-| 5 | MSG-003 재시도 상한 | message_send_job_test 3건 | ❌ **버그 1** |
-| 6 | 배치 등록(크론)·멱등 | monthly_invoice_generation_job_test(Fugit::Cron 전건, 재실행 created=0) | ✅ |
-| 7 | INV-006 경계 | invoice_test(SENT·CANCELLED 조정 차단, DRAFT 자유), w2_invoices_flow_test | ✅ |
-| 8 | cancel 빈 사유 422 | invoice_test(errors.add+false), 통합 cancel 404 격리 | ✅ |
-| 9 | W1 회귀(게이트) | w2_invoices_flow_test(온보딩 게이트 3경로) | ✅ |
-| 10 | SIMULATED 격리 | message_send_job_test(practice 0호출 카운터) | ✅ |
+### `test/controllers/landing_controller_test.rb` — 7 tests / 32 assertions
 
-## 4. Rule ID 커버리지
+| 테스트 | 검증 내용 |
+|:---|:---|
+| 비인증 `/` 200 + 랜딩 레이아웃 (`main#landing_main`) | root 변경(2026-11-04) |
+| 랜딩 레이아웃에 앱 셸 하단탭 내비 없음 (`nav[aria-label=주요 메뉴]` 0개) | 리디자인 레이아웃 분리 |
+| SEO 메타: title·description·og:title·og:description 값 일치 | 13.7 |
+| 전환 지점 렌더: `cta_hero` 앵커 / `form_start` 폼 / FAQ `details summary` | 13.5 |
+| 인증 원장 `/` → **303** `/dashboard` | root 게이트 |
+| 온보딩 미완료 원장도 랜딩은 게이트 없이 `/dashboard`로 (skip 2종) | 게이트 skip 정합 |
+| 비인증 `/dashboard` → 로그인 리다이렉트 | 기존 인증 게이트 유지 |
 
-| Rule ID | 검증 내용 | 상태 |
-|:---|:---|:---|
-| INV-001 | 모델 검증 + DB 유니크(우회 삽입 RecordNotUnique) + Generator 멱등 skip | ✅ |
-| INV-002 | READY 조정 사유 필수 + change_history 기록 / DRAFT 무사유 | ⚠️ 로직은 통과, 재렌더 500 = 버그 2 |
-| INV-003 | billable·remindable·sendable 제외 + 취소 시 QUEUED 연쇄 FAILED + 잡 가드 | ✅ |
-| INV-004 | paused 제외(excluded=1), active만 생성 | ✅ |
-| INV-006 | DRAFT→READY confirm 전제, SENT/CANCELLED 조정 차단 | ✅ |
-| MSG-001 | 모델 검증 + partial unique 인덱스(where절 포함) + RecordNotUnique duplicated + resend_of 예외·resends 연결 + 단계별 유일성 + 배치 재실행 멱등 | ✅ |
-| MSG-002 | fallback:true 응답 → FALLBACK_SENT 기록 + 청구 SENT | ✅ |
-| MSG-003 | 1차 실패 재시도 1회 / ConfigError 0회 | ❌ 버그 1 |
-| MSG-004 | 제외 토글 직후 배치 대상 탈락 | ✅ |
-| MSG-006 | 08시→당일 9시, 야간 22시→익일 9시, 23시 설정→17시 클램프 | ✅ |
-| MSG-007 | QUEUED만 취소, 예약 등록→취소(로그 제거·READY 복귀), 무효 시각 즉시발송 변질 차단(W10) | ✅ |
-| TEN-001 | 타 테넌트 invoice 조회·취소·재발송·예약취소 전부 404 + 로그 보존 | ✅ |
-| TEN-004 | 원생 이름·원비 변경 후 스냅샷 불변 | ✅ |
+### `test/controllers/beta_applications_controller_test.rb` — 11 tests / 98 assertions
 
-## 5. Phase 6 수정분(C1~C5) 검증 결과
+| 테스트 | Rule ID / 근거 |
+|:---|:---|
+| 신청 폼 페이지 공개 렌더 (비인증 200) | 13.6 / 공개 라우트 |
+| 정상 제출 303 완료 화면 + 레코드 1건 + 필드값·동의 기본값 검증 | 13.6 / Turbo PRG |
+| 완료 화면 200, 접수 안내만 표시, SLA 문구("24시간"/"즉시") 부재 | 13.6 (시간 약속 금지) |
+| 필수 동의 누락 → **422** 랜딩 재렌더 + 오류 요약 + 속성 라벨 노출 | Turbo 규약 / 13.6 |
+| 잘못된 이메일 → 422 + 커스텀 메시지(`activerecord.errors.messages.invalid_email`) | 13.6 |
+| 본문 누락 → 400 (Strong Parameters) | 세션 테스트 선례 |
+| **TEN-002** 허용 목록 외 필드(ip_address·resident_number) 무시 + 정상 필드 저장 | TEN-002 |
+| 동일 연락처 재제출 → 303 멱등 종결 + 레코드 1건 유지 + notice 없음 | 13.6 (중복 노출 금지) |
+| 연락 수단이 다르면 별도 신청 (email vs phone) | 유니크 인덱스 경계 |
+| 전화 하이픈 제출 → 정규화 + DB 암호문 확인 (컨트롤러 플로우 경유) | TEN-003 |
+| 11회째 제출 → rate limit: 랜딩 303 리다이렉트 + alert 문구 + 미생성 | 13.6 스팸 방어 (10회/1시간) |
 
-| 항목 | 검증 | 결과 |
-|:---|:---|:---|
-| C1 partial unique 인덱스 | 인덱스 존재(where "resend_of_id IS NULL") + 우회 삽입 차단 + Dispatcher rescue | ✅ |
-| C2 d3 경계 | 경과 1·2일 nil / 3일 d3 / 6일 d3 / 7일 d7 | ✅ |
-| C3 크론 등록 | recurring.yml 전 schedule Fugit::Cron 파싱 | ✅ |
-| C4 취소 발송 차단 | 잡 가드 FAILED(INVOICE_CANCELLED)·클라이언트 0호출, cancel! 연쇄, resend 차단 | ✅ |
-| C5 SENT 선반영 제거 | 수신처 없는 건 READY 유지 + missing 집계 + dispatched ids만 전이 | ✅ |
+### `test/application_system_test_case.rb` (신규) + `test/system/landing_responsive_test.rb` — 4 tests / 11 assertions
 
-## 6. 실패 원인 분류 요약
+| 테스트 | 검증 내용 |
+|:---|:---|
+| 360px 뷰포트 가로 스크롤 없음 (`scrollWidth <= 360`) | PRD 16장 반응형 |
+| CTA 2지점(`cta_hero`) 확인 + 헤더 CTA 클릭 → `#beta` 앵커 이동 + 폼 표시 | 13.5 |
+| 베타 폼 필드 표시·입력 가능 (이름 fill_in + select/input 3종) | 13.6 |
+| FAQ 아코디언 열림/닫힘 (`details[open]` 토글) | 13.3 시안 상호작용 |
 
-- 1 failure + 1 error: **모두 코드 버그**(§2) — 테스트 오류·플레이크 0. 해당 2개 테스트는 버그 수정 후 즉시 통과되도록 규칙 기준으로 작성됨(수정 시 테스트 변경 불요).
+## 2. 기존 회귀 결과
 
-## Phase 6-2 수정 후 재실행 (W2Fix2Dev / 2026-10-20)
+- 작성 전 베이스라인: 135 runs, 541 assertions, 0 failures (2026-11-04 Phase 6 보고와 동일).
+- 완료 후: 기존 135건 전부 통과, **수정한 기존 테스트 0건** (라우트 이동에 따른 Phase 3-B의 3파일 치환분은 이미 반영돼 있어 본 Phase 개입 불필요).
 
-| 항목 | 수정 | 재검증 |
-|:---|:---|:---|
-| 버그 1 [MSG-003] | message_send_job.rb:89 — `executions <= MAX_AUTO_RETRIES` → `executions <` (executions=0만 재시도) | ✅ "MSG-003 2차 실패 후에는 재시도가 없다" 통과 — 2차 실패에서 재시도 잡 0건, FAILED/NETWORK_ERROR 확정 |
-| 버그 2 [INV-002] | invoice.rb — `attr_accessor :change_reason` 추가(가상 어트리뷰트, 컨트롤러 invoice_params[:change_reason] 경로와 정합) | ✅ "INV-002 READY 청구 수정은 사유 없이 422, 사유와 함께 성공한다" 통과 — 422 재렌더 Template::Error 소멸 |
+## 3. 개발 중 수정한 신규 테스트 (전부 테스트 측 원인 — 코드 버그 아님)
 
-- 결과: **135 runs, 541 assertions, 0 failures, 0 errors** — 테스트 파일 변경 없음
-- 품질 게이트: `bin/rubocop` 85 files no offenses / `bin/brakeman` No warnings found
+| # | 증상 | 원인 분류 | 조치 |
+|:---|:---|:---|:---|
+| 1 | `invalid_email` 메시지 단언 실패("Translation missing") | 테스트 오류 — 커스텀 메시지 키는 `activerecord.errors.messages.*` 하위 | 키 경로 수정 |
+| 2 | "email vs phone 중복 아님" 테스트 422 | 테스트 설계 오류 — "same@example.com"은 전화 형식 검증을 통과할 수 없어 422가 정상 | 유효한 전화번호로 재작성 |
+| 3 | 360px 뷰포트 테스트에서 scrollWidth=485 | **환경 제약** — headless Chrome 신모드 최소 윈도우 폭 500px로 `window.resize_to`가 클램프됨(레이아웃 버그 아님. 485는 500px 뷰포트에서의 콘텐츠 폭) | CDP `Emulation.setDeviceMetricsOverride`(360×740)로 뷰포트 강제 → 360px 기준 검증 성공 |
+| 4 | `details[:open]`이 "false" 문자열 반환 | 테스트 오류 — Selenium 속성 반환 타입 문제 | CSS 셀렉터 `details[open]` 방식으로 교체 |
+| 5 | CTA 클릭 Ambiguous (2매치) | 테스트 오류 — 헤더·히어로 2곳이 모두 `cta_hero` | `within "header"`로 범위 한정 |
+
+## 4. [코드 버그] 0건
+
+구현 버그로 판명된 실패 없음. 중복 멱등(303·레코드 1건), 유니크 인덱스 차단, 422 재렌더, rate limit, 인증 게이트, 암호화 저장 모두 구현 동작과 일치.
+
+## 5. 스킵·자동화 밖 항목
+
+| 항목 | 사유 |
+|:---|:---|
+| 로그 마스킹(`contact_value => "[FILTERED]"`) 자동화 미포함 | 로그 파일 검증은 자동화 밖 — Phase 6 스모크에서 이미 실증. 필요 시 CI 로그 단계 추가 가능 |
+| 랜딩 카피 하드코딩 스캔 생략 | 리뷰(05_review.md) 확인 + 통합 테스트가 ko.yml 키 값 대조(메타·완료 문구)로 간접 검증 |
+| 실기기(실제 모바일 기기) 확인 | 헤드리스 에뮬레이션 한계 — 배포 전 실기기 1회 권장(리뷰어 권고와 동일) |
+
+## 6. 커버리지 공백·권고
+
+1. **CI 게이트 공백**: `config/ci.rb`의 "Tests: System" 스텝이 주석 상태 → 신규 시스템 테스트(4건)가 `bin/ci`에서 미실행. `bin/rails test` 기본 러너는 `test/system`을 포함하지 않음. **주석 해제 권장** (1라인, 본 Phase 범위 밖이라 미수정).
+2. rate limit은 IP 단위(동일 IP)만 검증 — 분산 제출 시나리오는 과투자 금지 원칙상 미커버.
+3. 422 재렌더 시 폼 위치 자동 스크롤 부재는 구현 한계(03_implementation.md §7-3) — UX 과제이며 자동화 검증 불요.
+4. beta_applications fixtures 미작성(암호화 컬럼 정책) — 향후 이 모델을 fixture로 써야 할 경우 raw SQL 삽입이 되어 TEN-003 우회 위험이 있으니 모델 API 생성을 유지할 것.
+
+## 7. 신규/변경 파일 (Phase 7)
+
+| 파일 | 구분 |
+|:---|:---|
+| `test/models/beta_application_test.rb` | 신규 (17 tests) |
+| `test/controllers/landing_controller_test.rb` | 신규 (7 tests) |
+| `test/controllers/beta_applications_controller_test.rb` | 신규 (11 tests) |
+| `test/system/landing_responsive_test.rb` | 신규 (4 tests) |
+| `test/application_system_test_case.rb` | 신규 (headless_chrome, 시스템 테스트 베이스) |
+| 기존 테스트 파일 | 수정 없음 |

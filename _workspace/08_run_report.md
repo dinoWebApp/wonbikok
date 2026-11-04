@@ -1,34 +1,34 @@
-# 08 — 실행 검증 (Phase 8, W2)
+# Phase 8: 실행 검증 보고 (2026-11-04)
 
-- 실행: 오케스트레이터 / 2026-10-21
-- 대상: W2 F3(월간 청구·솔라피 알림톡) + F6(미납 리마인더) + W1 후속 3건
+## 구동 방식
 
-## 부트 결과
+- `bin/dev`(foreman): Puma 부트 성공(Puma 8.0.2, Listening 127.0.0.1:3000) — 단, `tailwindcss:watch`가 샌드박스 환경에서 즉시 exit 0 → foreman SIGTERM 전파로 종료됨. **[환경 제약 — 앱 결함 아님]** CSS는 Phase 3-B에서 `tailwindcss:build` 완료 상태.
+- 대체: `bin/rails server` 백그라운드 구동으로 검증 수행.
 
-| 항목 | 결과 |
-|:---|:---|
-| 서버 | Puma 8.0.2, **Ruby 4.0.7 / Rails 8.1.4** |
-| 기동 | `Listening on http://127.0.0.1:3000` ✅ |
-| 로그 스캔 | 최근 세션 윈도우(마지막 120행)에서 4xx/5xx·ERROR·FATAL **0건** ✅ (마지막 30요청: 200×1, 302×3) |
+## 부트 확인
 
-## HTTP 스모크
+- `Booting Puma` / `Rails 8.1.4 development` / `Listening on http://127.0.0.1:3000` 확인. 부트 에러 키워드(error/FATAL/exception) 0건.
 
-| 요청 | 기대 | 실제 | 판정 |
-|:---|:---|:---|:---|
-| GET `/` (미인증) | 게이트 302 | 302 → `/session/new` | ✅ |
-| GET `/invoices` (W2 신규·보호) | 302 게이트 | 302 → `/session/new` | ✅ |
-| GET `/reminders` (W2 신규·보호) | 302 게이트 | 302 → `/session/new` | ✅ |
-| GET `/students` (W1 회귀) | 302 게이트 | 302 → `/session/new` | ✅ |
-| GET `/session/new` | 200 | 200 | ✅ |
+## 라우트 검증 (비인증)
+
+| 경로 | 상태 | 비고 |
+|---|---|---|
+| `/` | **200** | 랜딩 렌더 (59,624 bytes) |
+| `/dashboard` | 302 → `/session/new` | 비인증 게이트 유지 ✅ |
+| `/beta_applications/new` | **200** | 베타 신청 폼 |
+| `/students` `/invoices` `/reminders` | 302 → `/session/new` | 기존 기능 게이트 유지 ✅ |
+| `/session/new` | 200 | 로그인 |
+
+## 랜딩 콘텐츠 검증
+
+키워드 5종 전부 OK: title "원비 마감, 콕 찍고 끝" · 히어로 "매달 반나절 걸리는 원비 마감" · FAQ "우리 공부방도 현금영수증" · 요금 "9,900" · CTA "30일 무료".
 
 ## WARN 분류
 
-| 분류 | 건수 | 내용 |
-|:---|:---|:---|
-| [수정 필요] | 0 | — |
-| [허용/환경] | 1 | supervised 서비스 래퍼 PATH 문제 재확인 — **W1 런레포트의 절대경 Ruby 기동 레시피로 정상 기동**(레시피 상시 사용 권장) |
-| [주의] | 0 | 고아 프로세스 없음(사전 점검: port 3000 홀더 0) |
+- WARN/ERROR/FATAL **0건**. 응답 200×7·302×4, 뷰 렌더 시간 정상(최대 65ms).
+- [허용] tailwindcss:watch 즉시 종료 — 샌드박스 파일 감시 제약, 운영 영향 없음(빌드는 정상).
+- [주의] 없음.
 
-## 결론
+## 종료
 
-실행 검증 **통과** — Phase 9(완료 보고) 진행.
+검증 후 서버 정상 종료. 인증 상태 리다이렉트(303 /dashboard)·폼 멱등 제출은 Phase 7 테스트(174건)로 커버 확인.

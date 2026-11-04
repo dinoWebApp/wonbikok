@@ -1,193 +1,300 @@
-# W2 F3 구현 보고 — 월간 청구 & 납부 안내 + 솔라피 알림톡
+# 03 구현 보고: 전체 퍼블리싱 리디자인 Phase 3-A (2026-11-04)
 
-- 담당: W2F3Dev / 2026-10-20
-- 검증: `bin/rails db:migrate` 전건 up, `bin/rubocop` **no offenses(72 files)**, `bin/brakeman` **no warnings**, `bin/rails test` **76 runs, 325 assertions, 0 failures**(기존 73 + 신규 통합 스모크 3), `bin/rails runner` 서비스 스모크 10단계 + HTTP 흐름 스모크 전건 통과, 스모크 데이터 클린업(tenants=0)
+작업자: wonbikok-developer / 범위: 플랜 §1-B (랜딩 3-B 제외) / 로직·컨트롤러·모델·라우트·헬퍼·테스트 변경 없음
 
-## 1. 생성/수정 파일 목록
+## 1. 생성/수정 파일 전체 목록
 
-| 구분 | 파일 |
-|:---|:---|
-| 마이그레이션 | db/migrate/20261020000006_create_invoices.rb, 20261020000007_create_message_logs.rb, 20261020000008_add_reminder_settings_and_exclusions.rb (schema.rb 반영) |
-| 모델 | app/models/invoice.rb(신규), message_log.rb(신규), tenant.rb(수정: invoices/message_logs·리마인더 설정 검증), student.rb(수정: invoices/message_logs) |
-| 서비스 | app/services/solapi/client.rb, solapi/message_builder.rb, invoices/generator.rb, notifications/dispatcher.rb |
-| 잡 | app/jobs/message_send_job.rb, monthly_invoice_generation_job.rb, reminder_dispatch_job.rb |
-| 컨트롤러 | app/controllers/invoices_controller.rb(신규) |
-| 헬퍼 | app/helpers/invoices_helper.rb(신규: 상태 배지·전월/익월) |
-| 뷰 | app/views/invoices/{index,edit,cancel,results}.html.erb, dashboard/show.html.erb('이번 달 청구 만들기' 연결) |
-| 라우팅 | config/routes.rb(invoices RESTful + confirm/results/send_batch/cancel/resend/cancel_queue) |
-| 로캘 | config/locales/ko.yml(invoices/messages/대시보드/activerecord/enums/time 포맷) |
-| 설정 | config/recurring.yml(배치 2종), config/solapi.yml(신규 — 키 주입 가이드) |
-| 테스트 | test/integration/invoices_flow_smoke_test.rb(개발 스모크용 — Tester 슬라이스에서 확장 기반으로 사용 가능) |
-
-## 2. 레이어별 구현 요약
-
-- **DB**: invoices — [student_id, target_month] **유니크 인덱스**(INV-001 DB 강제) + 모델 검증, 스냅샷(student_name_snapshot·base_amount — TEN-004), adjustment_amount/note, due_on, status 6종(9.1 — PARTIALLY_PAID·PAID는 W3), sent_at/cancelled_at/cancel_reason, **change_history:text**(INV-002 확정 후 수정 사유 이력 — 명세에 없는 최소 추가, §6 참조). message_logs — channel(알림톡/SMS)·template_type·status 6종(9.3)·provider_message_id·error_code/message·sent_at·**resend_of_id**(MSG-001 재발송 예외 이력 — belongs_to 규약상 `_id` 접미 사용)·**job_id**(MSG-007 예약 취소용 — §6 참조). tenants — remind_tone/d3/d7/month_end/remind_send_hour(기본 9, MSG-006). students — excluded_from_reminders(MSG-004).
-- **모델**: Invoice — enum validate: true, 상태 전이 가드(confirm! DRAFT→READY / cancel! 사유 필수·CANCELLED / mark_sent! READY·SENT만), adjust!(DRAFT 자유·READY 이후 사유 필수+change_history 기록), 스코프 for_month/billable(INV-003)/sendable. MessageLog — 발송 유일성 검증 `dispatch_uniqueness`(on: :create, resend_of 있는 건만 예외 — MSG-001), cancellable?(QUEUED만 — MSG-007).
-- **Solapi::Client**: Messages v4 `POST /messages/v4/send-many/detail`. 인증 헤더는 공식 문서(https://solapi.com/developers/api/authentication-api-key) 그대로 — `Authorization: HMAC-SHA256 apiKey=…, date=<ISO8601 UTC>, salt=<12바이트 hex>, signature=HMAC-SHA256(api_secret, date+salt) hexdigest`. 대체발송은 공식 문서(https://solapi.com/developers/api/messages-disablesms) 기준 — **알림톡(ATA)은 기본 대체발송 활성**이며 `kakaoOptions.disableSms: false`(명시) + **사전 등록 발신번호 `from` 필수**라서 요청에 항상 포함(MSG-002 단일 요청 위임). 응답 파싱: failedMessageList(접수 실패)→실패, groupInfo.count.sentReplacement>0→FALLBACK_SENT(채널 구분 표시), messageList.messageId→provider_message_id, statusCode 2000 외→실패 코드 기록. 예약은 `messages[].scheduledDate`(UTC ISO8601), 취소는 그룹 DELETE(msg-groups API). 타임아웃(open 5s/read 15s)·네트워크 오류→NETWORK_ERROR Result(잡에서 재시도 판정). credentials 미설정 시 ConfigError → 잡이 SIMULATED 처리.
-- **Solapi::MessageBuilder**: 카카오 템플릿 변수 치환값(원생명·청구월·금액·계좌·기한·원장상호·원장전화) 생성. 템플릿 ID/pfId는 config/solapi.yml(운영 주입). SMS/LMS 폴백 본문은 ko.yml 문구 + 변수 보간 — **I18n 보간 키는 ASCII 필수**(\w+ 패턴이라 한글 키 불가 — 실증으로 확인), 90바이트 초과 시 LMS(subject 부여, autoTypeDetect).
-- **Invoices::Generator**: Student.active만(INV-004) 스냅샷 청구 초안 생성, due_on=payment_day(1~28 clamp), 기존 존재(of_kind? :taken) skip 멱등, created/skipped/excluded 리포트. 배치·수동 트리거 공용.
-- **Notifications::Dispatcher**: 유일성 검증 후 MessageLog QUEUED 생성(중복은 duplicated 카운트) → MessageSendJob 예약(wait_until)·job_id 기록(MSG-007) / cancel_scheduled — SolidQueue::Job discard + 로그 폐기 + 청구 READY 복귀. 수신처는 대표 보호자 복호화 번호, 부재 시 recipients_missing 집계.
-- **MessageSendJob**: practice 테넌트·키 미설정 → 실호출 0건 SIMULATED(기록+청구 SENT). 실패 시 FAILED(사유 코드·메시지), **NETWORK_ERROR/API_ERROR만 1회 자동 재시도(executions<=1 → retry_job 5분) — MSG-003 상한**, 재시도 소진 후 FAILED 확정. 성공 시 FALLBACK_SENT/SENT + provider_message_id + 청구 mark_sent!.
-- **배치**: recurring.yml — monthly_invoice_generation(매월 1일 07:00), reminder_dispatch(매일 09:00 — MSG-006, F6 슬라이스의 Reminders::Scheduler를 defined? 위임하는 훅).
-- **컨트롤러·뷰**: 전 조회 current_tenant 스코프(TEN-001), params.expect, 실패 422/성공 303. index(월 내비게이션·생성·미리보기 요약[총액·인원·상태별]·확정·발송 폼[대상 선택·즉시/예약]·원생별 목록·빈 상태), results(성공/실패/사유·대기열 표시·다시 보내기·예약 취소 — MSG-007), edit(조정액·비고·확정 후 사유 필수+이력 표시), cancel(사유 폼 — GET 폼/POST 처리 분기, HEAD도 폼 처리 — brakeman verb confusion 해소). 전 문구 ko.yml, Tailwind 모바일 퍼스트(F1/F2 관례), 상태 배지 헬퍼.
-
-## 3. F3 수용조건 자체 점검
-
-- [x] 같은 원생 × 같은 월 중복 청구 방지 — 유니크 인덱스+모델 검증+Generator 멱등 skip(스모크 1단계)
-- [x] 확정 전 미리보기·수정, 확정 후 수정 사유 기록, 발송 전까지 수정 — adjust! 사유 필수+이력(스모크 3단계: 사유 없이 실패·사유와 성공·이력 1건)
-- [x] 알림톡 실패 시 SMS/LMS 자동 대체(솔라피 disableSms=false+from) — 채널 구분 FALLBACK_SENT로 동일 이력 통합
-- [x] 당월 중복 발송 방지 + '다시 보내기' 예외 이력 — dispatch_uniqueness 검증(중복 2건 차단 실증)+resend_of 연결(스모크 4·5단계)
-- [x] 예약 발송 취소 가능·대기열 표시 — QUEUED 상태 표시+cancel_scheduled(스모크 6단계: 취소 후 로그 제거·READY 복귀)
-- [x] 무한 재시도 방지 — 자동 재시도 상한 1회(MSG-003)
-- [x] 취소 청구 수납 합계 제외 — billable 스코프(INV-003, 스모크 7단계; 수납 합계 산출 자체는 W3 PAY)
-- [x] 연습 모드 실호출 0건 — SIMULATED(스모크 4단계, HTTP 흐름에서도 확인)
-
-## 4. Rule ID 강제 수단
-
-- INV-001: DB 유니크 인덱스 + 모델 uniqueness(scope) + Generator skip
-- INV-002: adjust! 사유 필수(READY 이후) + change_history JSON 이력
-- INV-003: Invoice.billable 스코프(취소 제외) + cancel! 사유 필수
-- INV-004: Generator가 Student.active만 사용
-- INV-006: DRAFT→READY confirm! 전 미리보기·수정 자유, mark_sent! 전이 가드
-- MSG-001: MessageLog dispatch_uniqueness 검증(resend_of 예외)
-- MSG-002: 솔라피 대체발송 단일 요청(disableSms=false+from) + FALLBACK_SENT 채널 구분
-- MSG-003: MessageSendJob 재시도 상한 1회
-- MSG-006: remind_send_hour 기본 9 + 9..17 검증(야간 금지), reminder_dispatch 09:00
-- MSG-007: QUEUED 대기열 표시 + cancel_scheduled(예약 취소) + job_id
-- TEN-001: 컨트롤러 전 current_tenant 스코프, TEN-004: 스냅샷 컬럼+Generator 복제
-
-## 5. 검증 결과 (실시행)
-
-1. **서비스 스모크(rails runner, 10단계 전부 OK)**: Generator created=2/skip=2·휴원 제외 → 확정 READY → 조정(사유 필수·이력) → Dispatcher 유일성(중복 2건 차단)·SIMULATED 전이·Invoice SENT → 재발송 resend_of 연결 → 예약 등록·취소(READY 복귀) → cancel!(CANCELLED·billable 제외) → MessageBuilder 치환·폴백("[스모크학원] 안녕하세요, 이원생 학부모님. 10월 원비 300,000원…", LMS=true) → Client ConfigError(키 미설정) → 전 테넌트 배치 잡 실행
-2. **HTTP 흐름 스모크(통합 테스트 3건)**: 생성→확정→발송(SIMULATED·SENT 배지)→결과 페이지, 취소(사유 필수·CANCELLED), 취소/조정 폼 렌더
-3. bin/rubocop 72 files no offenses / bin/brakeman no warnings / bin/rails test 76 runs 0 failures / db:migrate 전건 up / routes 전건 확인 / 부트 확인
-
-## 6. 명세 대비 최소 추가·판단 사항 (오케스트레이터 확인용)
-
-1. **invoices.change_history:text**: INV-002 "확정 후 수정은 변경 사유 기록"의 저장소가 명세 컬럼 목록에 없어 추가(JSON 배열: 시각·사유·조정액·비고). cancel_reason으로는 커버 불가.
-2. **message_logs.job_id:string**: MSG-007 예약 취소를 위해 예약 잡 식별자 저장 필요. 취소는 SolidQueue::Job.discard로 처리.
-3. **resend_of → resend_of_id**: 명세의 resend_of는 belongs_to 규약(FK `_id`)에 맞게 resend_of_id로 명명(기능 동일).
-4. **config/solapi.yml 신규**: credentials 가이드 겸 기본값(빈 값 → SIMULATED). 실키는 config/credentials.yml.enc의 solapi 섹션으로 주입(파일 상단 주석에 구조 명시).
-5. **SMS 폴백 문구의 I18n 보간 키는 ASCII**(student_name 등): I18n 보간 패턴 \w+가 한글 키를 매칭하지 못함 — 실증 확인. 카카오 템플릿 변수(운영 템플릿과 매핑)는 한글 키 그대로.
-6. **cancel 액션 GET/POST 분기**: 사유 폼(사유 입력 필요)과 처리를 하나의 member 경로로 제공 — GET/HEAD는 폼, POST는 처리. brakeman HEAD verb confusion 경고도 해소(326 → 0).
-7. **발송 시 Invoice SENT 전이**: 즉시 발송은 큐 등록 시 SENT 선반영 + 잡 성공 시 mark_sent!(멱등). 예약발송은 잡 완료 시 전이(대기 중 READY 유지).
-8. **테스트 파일**: test/integration/invoices_flow_smoke_test.rb는 개발 검증용 스모크이며 Tester 슬라이스의 시나리오 확장 기반으로 유지(전체 스위트에 포함되어 통과).
-
-## 7. 열린 이슈·리스크
-
-1. **실발송 검증**: 솔라피 api_key/api_secret/발신번호·카카오 템플릿 심사는 운영 준비물. 키 주입 전까지 모든 발송은 SIMULATED. 실발송 1건 스모크는 별도 확인 단계(유료).
-2. **대체발송(FALLBACK_SENT) 판별**: 응답 groupInfo.count.sentReplacement는 그룹 단위 집계라 단건 발송(원비콕은 1요청 1메시지)에서 정확. 다건 요청 시 건별 매핑은 messageList statusCode 확정 필요 — W2는 단건 위주라 문제없음, 코드 주석 표기.
-3. **예약발송 취소의 솔라피 측 정리**: cancel_scheduled은 자체 큐 잡만 discard하며, scheduledDate로 솔라피에 예약된 건의 그룹 취소(Client#cancel_scheduled)는 W2에서 미연결(즉시/예약 모두 발송 시점에 솔라피 호출되는 구조라 자체 큐 취소로 충분 — 구조 주석 표기).
-4. **솔라피 수신 리포트**: W2는 발송 요청 응답 기반 상태(14장 확정 사항) — 리포트 폴링/웹훅은 P1.
-5. **미완료 온보딩 테넌트 게이트 등 W1 후속 3건**: F6 슬라이스(②) 범위 — 본 슬라이스 미포함(스핀 계획상).
-6. **MessageSendJob의 Guardian 부재 처리**: Dispatcher가 수신처 없는 건을 QUEUED 미생성으로 집계(missing)하므로 잡 도달 건은 항상 보호자 존재 — 다만 잡 단독 재실행 시 primary_guardian nil 가능성은 FAILED 대상이 아닌 NoMethodError 위험 → Tester 슬라이스 검증 권장.
-
----
-
-# W2 F6 구현 보고 — 미납 리마인더 + W1 후속 3건
-
-- 담당: W2F6Dev / 2026-10-20
-- 검증: `bin/rails db:migrate` 전건 up(20261020000009 포함), `bin/rubocop` **no offenses(77 files)**, `bin/brakeman` **no warnings**, `bin/rails test` **77 runs, 350 assertions, 0 failures**, `bin/rails runner` 서비스 스모크 13단계 + HTTP 흐름 스모크(통합 테스트, 목록→미리보기→발송→설정→이력→제외→게이트→로그아웃 캐시 정리) 전건 PASS, 스모크 데이터 클린업(tenants=0)
-
-## 1. 생성/수정 파일 목록
-
-| 구분 | 파일 |
-|:---|:---|
-| 마이그레이션 | db/migrate/20261020000009_add_reminder_custom_texts.rb(tenants에 remind_custom_text_d3/d7/month_end — 최소 범위) |
-| 서비스 | app/services/reminders/scheduler.rb(신규), reminders/sample_invoice.rb(신규 — 설정 화면 예시 미리보기용, 개인정보 없음) |
-| 모델 | message_log.rb(template_type을 단계 기반 reminder_d3/d7/month_end로 교체 — tone명 soft/standard/formal은 미사용이던 F3 선제 추가분, REMINDER_TEMPLATE_TYPES·reminder 스코프 추가), invoice.rb(remindable 스코프 — W2 임시 미납 규칙, days_overdue), tenant.rb(REMINDER_TONES/STAGES·remind_custom_text(stage)·톤 검증·bank_info 컨텍스트 검증) |
-| 잡 | reminder_dispatch_job.rb(defined? 위임 훅 — 이제 Scheduler 존재로 자동 활성), message_send_job.rb(리마인더 template_type 시 MessageBuilder.reminder 경유) |
-| 컨트롤러 | reminders_controller.rb(신규), application_controller.rb(온보딩 게이트 전역화 — W1 후속①), sessions_controller.rb(게이트 skip + 로그아웃 CSV 캐시 정리 — W1 후속②), registrations/onboarding_controller.rb(게이트 skip), onboarding_controller.rb(save_bank_account valid?(:bank_info) — W1 후속③), dashboard_controller.rb(미납 요약·다가오는 리마인더 카운트) |
-| 뷰 | reminders/{index,preview,settings,history}.html.erb(신규), dashboard/show.html.erb(오늘 할 일·미납 요약·리마인더 링크) |
-| 라우팅 | config/routes.rb(reminders 7경로 — index/preview/deliver_now/settings/history/toggle_exclusion) |
-| JS | app/javascript/controllers/reminders_select_all_controller.js(신규 — 목록 전체 선택) |
-| 로캘·설정 | config/locales/ko.yml(reminders 섹션·messages.reminder 단계×톤 9종 문구·대시보드·template_type 라벨), config/solapi.yml(템플릿 키를 단계 기반으로 교체) |
-| 테스트 | test/integration/f6_http_smoke_test.rb(HTTP 흐름 스모크 — F3의 invoices_flow_smoke_test와 동일 컨벤션, 스위트 포함 통과), students_controller_test.rb(게이트 도입으로 타 테넌트 픽스처 1건 onboarding_step 보정 — 검증 대상(TEN-001 캐시 격리) 불변) |
-
-## 2. F6 레이어별 구현 요약
-
-- **Reminders::Scheduler**: ReminderDispatchJob(매일 09:00)이 호출. 대상 = `Invoice.remindable`(status IN (SENT/UNPAID/OVERDUE) & due_on 경과 & 완납 기록 없음[Payment W3 확장] & CANCELLED 제외[INV-003] & excluded_from_reminders=false[MSG-004]). 단계 판정은 `due_stage_for` 단일 기준: d3(경과 3~6일)/d7(경과 7일 이상·월말 전)/month_end(청구 대상월 말일 전날 이후). 각 단계 template_type이 상이라 MSG-001(청구×템플릿 유형) 유일성이 단계당 1회를 DB+검증+사전 필터 3중으로 강제(배치 누락 재실행에도 중복 없음 — 스모크 3단계). 발송 예약 시각은 `send_time_for`(MSG-006: 설정 시각 9~17, 허용 시간대 외 호출 시 다일 오전 이월) — 수동 즉시 발송에도 동일 적용. 문구는 원장 커스텀 우선 → 톤(부드러움/표준/공식) 기본 9종, MessageBuilder 경유로 원장상호·전화 포함(MSG-005).
-- **MessageBuilder**: `reminder(...)` 생성자 추가 — 커스텀 문구는 %{변수} 수동 보간(I18n ASCII 키 제약 회피), SMS 폴백 90바이트 LMS 전환·카카오 치환값은 F3 로직 재사용.
-- **컨트롤러·뷰**: 미납 목록(원생·금액·기한·경과일·마지막 리마인더·제외 배지, 필터[전체/제외 원생], 전체 선택) → 즉시 발송 미리보기(수신자 마스킹[TEN-003]·단계·본문·수신처 없음/제외 안내) → 발송(Dispatcher 경유, 이력 MessageLog). 설정(톤·단계 3토글·발송 시각 9~17·단계별 커스텀 문구 + 예시 데이터 미리보기). 발송 이력(리마인더 건 원생별·일시별, 원생 필터). 제외 토글은 목록에서 즉시(해제 시 자동 발송 즉시 배제 — MSG-004). 대시보드에 미납 건수/총액·다가오는 리마인더·바로가기 추가(기준 문구 명시).
-- **W1 후속 3건**: ① 온보딩 미완료 게이트를 ApplicationController 전역 before_action으로 확장 — sessions/registrations/onboarding만 skip, /students 등 전 메인 기능 직접 접근 차단(HTTP 스모크로 검증). ② sessions#destroy에서 session의 CSV 오류내역 키로 서버 캐시 삭제 + 세션 키 제거. ③ Tenant `validates bank_name/bank_account/account_holder, presence: true, on: :bank_info` + save_bank_account가 valid?(:bank_info) 선행(business_info 패턴과 동일).
-
-## 3. F6 수용조건 자체 점검
-
-- [x] 발송 이력 원생별·일시별 기록·조회 — MessageLog(reminder 스코프) + history 화면(스모크/HTTP)
-- [x] 제외 설정 원생 자동 발송 즉시 배제 — remindable 스코프가 매 배치 재판정(스모크 4단계)
-- [x] 발신자 표기 원장 채널/번호 기준 — 솔라피 from(사전등록 번호, F3 Client) + 본문 원장상호·전화(MSG-005)
-- [x] 단순 미납은 중립 표시 — 미납 목록은 slate 톤, 경고색 미사용(강조색은 발송 액션만)
-- [x] 각 단계 ON/OFF·발송 시간대 설정(야간 금지) — 설정 화면 + remind_send_hour 9..17 검증
-- [x] 문구 템플릿 3종 + 원장 수정·저장 — 커스텀 문구 저장 우선 적용(스모크 7단계 치환 확인)
-- [x] 최근 발송 기록 표시로 반복 발송 방지 — 목록에 마지막 리마인더 일시 + MSG-001 유일성
-
-## 4. Rule ID 강제 수단 (F6)
-
-- MSG-001: 단계별 template_type 상이 + MessageLog dispatch_uniqueness + Scheduler 사전 필터
-- MSG-003: 재시도 상한은 기존 MessageSendJob(1회) 그대로 — 리마인더 동일 경유
-- MSG-004: remindable 스코프 + 제외 토글 즉시 반영(스모크)
-- MSG-005: MessageBuilder 원장상호·원장전화 치환 + 솔라피 from
-- MSG-006: remind_send_hour 9..17 검증 + send_time_for 이월 로직 + recurring 09:00
-- INV-003: remindable이 CANCELLED 배제
-- TEN-001: RemindersController 전체 current_tenant 스코프, preview/dispatch도 remindable 재적용
-- TEN-003: 미리보기 수신자 masked_phone 뷰 마스킹
-
-## 5. 명세 대비 판단 사항 (오케스트레이터 확인용)
-
-1. **template_type 교체**: F3이 선제 추가한 tone 기반 reminder_soft/standard/formal은 미사용이었고 단계별 유일성과 충돌하여 단계 기반(reminder_d3/d7/month_end)으로 교체. 톤은 Tenant.remind_tone + ko.yml 문구 9종(3단계×3톤)으로 반영. 관련 ko.yml/solapi.yml 키 전량 갱신(클린 커트오버 — DB 데이터 없음).
-2. **단계 중복 노출 시 동작**: d7 도래 건이 d3를 건너뛴 경우(배치 중단 등) d3는 미발송으로 종료 — due_stage_for가 단일 단계만 반환하기 때문. 대신 d7이 확실히 발송됨(유일성 우선 설계).
-3. **월말 단계 범위**: month_end는 대상월 말일 전날 이후 매일 재평가되며 유일성으로 1회만 발송. 이전 달로 넘어간 미납은 month_end 단계를 다시 맞지 않음(d7이 담당) — W2 임시 규칙 기준.
-4. **수동 발송의 제외 원생**: MSG-004는 '자동 발송' 배제 규정이므로 원장 즉시 발송은 허용(미리보기에 안내 문구 표시) — 미리보기 화면에서 원장 판단 유도.
-5. **테스트 1건 픽스처 보정**: students_controller_test의 타 테넌트 세션 테스트에 `@other_tenant.onboarding_step` 완료 보정 1줄 추가(게이트 도입의 직접 결과, 검증 대상 불변).
-
-## 6. 열린 이슈·리스크
-
-1. **UNPAID/OVERDUE 상태 미사용**: W2는 SENT만 존재(상태 자동 전이는 W3 수납 도입 시) — remindable은 규칙 선반영 상태.
-2. **카카오 템플릿 심사**: reminder_d3/d7/month_end 템플릿 코드는 운영 주입 필요(config/solapi.yml). 미주입 시 SIMULATED로 기록(실발송 없음).
-3. **month_end 판정 기준 시각**: `due_stage_for`가 서버 TZ(KST 가정) 기준 — TZ 변경 시 재확인.
-
----
-
-# Phase 6 수정 보고 — W2 리뷰 지적 12건(W2FixDev / 2026-10-20)
-
-- 검증: `bin/rails db:migrate` up(20261020000010 포함), `bin/rubocop` 78 files no offenses, `bin/brakeman` no warnings, `bin/rails test` **77 runs, 350 assertions, 0 failures**, `bin/rails runner` 스모크(유니크 동시 삽입 차단·d3 경계·크론 파싱·취소 청구 발송 차단) 전건 OK, 스모크 테넌트 클린업 완료. 자세한 이슈별 기록은 _workspace/05_review.md 각 항목 하단 '수정 완료' 참조.
-
-## 수정 파일
-
+**신규 (10)**
 | 파일 | 내용 |
+|---|---|
+| `tailwind.config.js` | 디자인 토큰 (PRD 16.1) — v3 문법, v4 `@config`로 로드 |
+| `app/views/shared/_button.html.erb` | 버튼 변형 파셜 (form/button_to/link/button 분기) |
+| `app/views/shared/_card.html.erb` | 카드 표면 (layout 파셜) |
+| `app/views/shared/_badge.html.erb` | 상태 배지 (16.2: 색상+점+텍스트) |
+| `app/views/shared/_form_field.html.erb` | 라벨+입력+에러+도움말 (layout 파셜) |
+| `app/views/shared/_empty_state.html.erb` | 빈 상태 (핀 모티프+CTA+보조 링크) |
+| `app/views/shared/_page_header.html.erb` | 제목+설명+액션 영역 (layout 파셜) |
+| `app/views/shared/_flash.html.erb` | notice(성공)/alert(오류) — 아이콘+색+텍스트 |
+| `app/views/shared/_stepper.html.erb` | 온보딩 4스텝 진행 표시 (완료/현재/대기) |
+| (디렉터리) `app/views/shared/` | 위 파셜 8종 |
+
+**수정 (26)**
+- 레이아웃: `app/views/layouts/application.html.erb` — 앱 셸 재구축
+- 에셋: `app/assets/tailwind/application.css` — `@config` 로드 + `@layer components` (.btn-*, .field-input)
+- 로케일: `config/locales/ko.yml` — 신규 키 + 표준 검증 메시지
+- 인증(2): sessions/new, registrations/new
+- 온보딩(4): step2~5 — 스텝퍼 추가
+- 원생(7): students index/show/_form/new/edit/import_new/import_result
+- 청구(4): invoices index/edit/cancel/results
+- 리마인더(4): reminders index/preview/settings/history
+- 대시보드(1): dashboard/show
+
+**변경 없음 확인(git 기준)**: controllers, models, helpers, config/routes.rb, db/, test/ — 0건
+
+## 2. 디자인 토큰 요약 (PRD 16.1 그대로)
+
+- **배경** canvas `#F7F9FC` / **표면** surface `#FFFFFF` / **본문** ink `#191F28` / **보조** muted `#667085` / **경계선** line `#E4E7EC`
+- **브랜드** brand: 50 `#EEF4FF` · 100 `#DBE7FE` · 200 `#BDD3FD` · **500 `#3478F6`**(PRD 지정 포인트·선택 상태) · 600 `#2563EB`(CTA 배경·링크, 흰 글자 AA 4.5:1) · 700 `#1D4ED8`(링크 텍스트 6.3:1)
+- **성공** success 50/100/200/500/600/700 (녹색 — 완납·발행 성공) / **주의** warning (주황 — 납부 예정·확인 필요) / **오류** danger (적색 — 발행·발송 실패·조치 필요) / **정보** info (청색 — 발송 대기·안내)
+- 폰트: Pretendard(jsdelivr static dynamic-subset CDN, preconnect) + 시스템 폴백 `-apple-system, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif`
+- 레이아웃 토큰: 간격 4px 계열, 카드 `rounded-xl`(12px) 통일, 버튼·입력 `rounded-lg`, 그림자 0(보더만), 금액 `text-right tabular-nums`, 터치 영역 `min-h-11`(44px), 주 CTA `btn-lg`(48px)
+
+## 3. 파셜 사용 가이드
+
+```erb
+<%# 버튼 (라벨은 동작 설명형) %>
+<%= render "shared/button", label: t("..."), url: path, variant: :primary, size: :lg, class: "w-full" %>
+<%= render "shared/button", label: t("..."), url: path, method: :patch, data: { turbo_confirm: t("...") } %>
+<%= render "shared/button", label: t("..."), form: form  %>  <%# form.submit 경유 %>
+<%# variant: :primary | :secondary | :destructive | :destructive_secondary | :warning_secondary %>
+
+<%# 카드 (블록 필수 — layout 파셜) %>
+<%= render layout: "shared/card", locals: { class: "p-5 space-y-4" } do ... end %>
+
+<%# 배지 (tone: :neutral | :success | :warning | :danger | :info — 색+점+텍스트) %>
+<%= render "shared/badge", tone: :success, text: t("invoices.status.SENT") %>
+
+<%# 폼 필드 (블록에 입력 요소, class: "field-input" 권장) %>
+<%= render layout: "shared/form_field", locals: { form: f, attr: :name,
+      label_text: t("..."), hint: t("..."), required: true } do %>
+  <%= f.text_field :name, class: "field-input" %>
+<% end %>  <%# 에러는 form.object.errors[attr] 자동 표시 %>
+
+<%# 빈 상태 / 화면 헤더 %>
+<%= render "shared/empty_state", title: t("..."), cta_label: t("..."), cta_url: path %>
+<%= render "shared/page_header", title: t("..."), description: t("...")  %>
+<%= render layout: "shared/page_header", locals: { title: t("...") } do ...액션... end %>
+<%# 스텝퍼/플래시: render "shared/stepper", current: 2 / render "shared/flash" %>
+```
+
+## 4. 뷰별 변경 요점
+
+| 화면 | 요점 |
+|---|---|
+| layouts/application | Pretendard CDN+preconnect, sticky 헤더(핀 로고·연습 배지·로그아웃), 데스크톱(md+) 상단 내비, 모바일 하단 4탭(홈/원생/청구/알림, 아이콘+텍스트·aria-current), main pb-24 md:pb-10, shared/flash |
+| sessions/new | 중앙 정렬 max-w-sm, 로고+태그라인, 카드형 폼, form_field 2개, btn-lg CTA |
+| registrations/new | 동일 골격, 테넌트명·휴대폰·비밀번호·확인 form_field 필수 표기 |
+| onboarding step2~5 | 스텝퍼(1~4) 추가, 카드 섹션 폼, step4 연동 준중립 배지, step5 연습=primary/실사용=secondary 이원 카드(commit 값 유지) |
+| students/index | page_header(신규 CTA primary), 검색 aria-label, 필터 칩(선택=brand), 카드형 목록(형제=info·상태=success/warning/neutral·대기=핀 배지), 금액 tabular-nums 우측, 빈 상태 CTA(등록+CSV 보조) |
+| students/show | 카드형 상세 dl(금액 행 tabular-nums 우측), 형제 info 안내, 이력 빈 상태(핀), 액션=수정/휴원(warning)/퇴원(destructive)/복원 |
+| students/_form | 오류 요약 box(danger), 2섹션 카드(원생·보호자), 전 필드 form_field+field-input, 저장 btn-lg flex-1+취소 |
+| students/new·edit | page_header + 중복 의심 warning box(new), 취소 액션 |
+| students/import_new | 2단계 카드(양식 다운로드→업로드), 파일 입력 스타일링, 규칙 카드 ul |
+| students/import_result | 성공/실패 count 카드(success/danger), 오류 상세 리스트, 오류행 다운로드 destructive_secondary |
+| invoices/index | page_header+월 이동, 청구 만들기(primary, INV-001 주석 유지), 요약 dl+상태 카운트, 확정(확인 다이얼로그 유지), READY 체크발송(예약·datetime), 카드형 청구 목록(배지·금액 우측·수정/취소), 빈 상태 |
+| invoices/edit | 기본 원비 고정 표시, 조정액(우측 tabular-nums), 변경 사유 필수(INV-002, warning 안내), 변경 이력 리스트 |
+| invoices/cancel | 대상 요약(이름+배지+금액), 사유 필수(label_tag for 연결), destructive CTA+확인(INV-003) |
+| invoices/results | 카드형 발송 결과(배지 통일), FAILED=danger+다시 보내기(MSG-001), QUEUED=info+예약 취소(MSG-007), SIMULATED=보조 문구, 빈 상태 CTA |
+| reminders/index | page_header(설정·이력 액션), 전체 선택(Stimulus 유지), 카드형 목록(체크박스 44px, 경과일 주의 강조, 제외 배지), 제외 토글 44px 상향(MSG-004), 빈 상태 CTA |
+| reminders/preview | 미리보기 카드(단계 배지, 수신자 마스킹 유지, 본문 pre), 발송+확인(15.4 확인 단계) |
+| reminders/settings | 톤 라디오 카드(has-checked), 단계 체크박스 44px, 발송 시각(MSG-006 힌트), 커스텀 문구 3개, 기본 문구 미리보기 |
+| reminders/history | 원생 필터 select(자동 submit 유지), 카드형 이력(배지 통일), 빈 상태 CTA |
+| dashboard/show | 오늘 할 일(미납=warning·리마인더=info 숫자 카드), 마감 시작(우선 CTA=청구 만들기 btn-lg, 원생·리마인더 보조) |
+
+## 5. 16.2 상태→배지 tone 매핑 (표준화)
+
+- 청구: DRAFT=중립 / READY=info / SENT=success / UNPAID·OVERDUE=warning / CANCELLED=중립(오류색 아님)
+- 메시지: QUEUED·SENDING=중립 / SENT·FALLBACK_SENT=success / FAILED=danger / SIMULATED=중립
+- 원생: active=success / paused=warning / withdrawn=중립 / 형제=info / 이번 달 대기=중립+핀
+- 색만으로 전달 금지 — 전 배지 텍스트 병행, 경고색은 조치 필요 상태에만(16.0)
+
+## 6. 테스트·게이트 결과
+
+| 게이트 | 결과 |
+|---|---|
+| `bin/rails tailwindcss:build` | 성공 (v4.3.3 엔진, 28KB) — 토큰·컴포넌트 클래스 17종 생성 확인(bg-brand-600, field-input, has-checked 등) |
+| `bin/rubocop` | 85 files, **no offenses** |
+| `bin/brakeman` | **0 warnings**, 0 errors |
+| `bin/rails test` | **135 runs, 541 assertions, 0 failures, 0 errors** — 시스템 테스트 셀렉터 실패 0건(시스템 테스트 미존재) |
+| 실행 스모크(dev 서버) | 로그인 200/303, 대시보드·원생·청구·리마인더 8화면 200, 하단탭·배지·마스킹(TEN-003 `010-****-`) 렌더 확인, 원생 등록 성공 303+플래시·422 검증 표시·중복 확인 422 플로우 재현 |
+
+## 7. 결정 사항 (합리적 기본값)
+
+1. **Tailwind v4 하위호환 경로**: 스택이 tailwindcss-rails 4.6.0(Tailwind v4.3.3)이므로, 지시된 v3 문법 `tailwind.config.js`를 CSS 엔트리의 `@config "../../../tailwind.config.js"`로 로드(v4 공식 하위호환). 빌드로 토큰 반영 검증 완료.
+2. **Pretendard static 채택**: variable CSS는 font-family명이 "Pretendard Variable"이라 지시된 `Pretendard` 스택과 불일치 → static dynamic-subset(CDN 200 확인) 사용, family명 일치로 폴백 안전.
+3. **컴포넌트 클래스(.btn-*, .btn-lg, .field-input)를 application.css `@layer components`에 정의**: 헬퍼 파일 수정 금지 조건에서 `form.submit` 등 헬퍼 생성 버튼까지 일관 적용 + 유틸리티 오버라이드 가능(components<utilities 레이어 순서). shared/_button은 변형 선택·태그 분기 담당.
+4. **헬퍼 미수정**: `status_badge_class` 등 구 배지 헬퍼는 그대로 두고 뷰에서 tone 매핑 후 shared/badge 사용(구 헬퍼는 이제 미사용).
+5. **layout 파셜 안전장치**: page_header/card는 `render layout:`(블록)과 positional(블록 없음) 모두 지원 — `defined?(yield)` 가드.
+6. **문구**: `common.back` 값 "목록"→"목록으로"(동작 설명형), 신규 키 nav.*/onboarding.steps.*/common.required/*_empty_cta/invoices.month_nav_label/students.index.status_label 추가, 기존 키 전부 유지.
+7. **ko.yml 표준 검증 메시지 추가(blank/invalid/taken 등)**: 리디자인 전부터 누락되어 422 시 "Translation missing"이 노출되던 기존 갭 — 스모크에서 발견, 로케일만 수정 허용 범위 내에서 보완. 422 응답 구조는 변경 없음(스모크로 재검증).
+8. **터치 영역**: 리마인더 제외 토글 등 기존 min-h-9(36px) 행동 버튼을 44px로 상향(15.4).
+9. **'콕' 핀 모티프**: 로고, empty_state 아이콘, "이번 달 대기" 배지에 적용. 상태 배지 점(dot)은 핀으로 대체하지 않음(장식 절제·가독성 우선).
+10. **하단탭 활성 판정**: `request.path` prefix + 홈=`/`. **Phase 3-B에서 root를 랜딩으로 옮길 경우 홈 탭 URL을 `/dashboard`로 수정 필요**(라우트 수정 금지 조건으로 본 단계에서 미수정).
+
+## 8. 남긴 이슈
+
+1. **3-B 의존**: root 라우트 이동 시 레이아웃 내비의 `root_path`(홈 탭·로고 링크)를 `dashboard_path`로 갱신해야 함(레이아웃 1파일).
+2. 구 배지 헬퍼(invoices_helper/students_helper의 *_badge_class) 미사용 코드화 — helpers 정리는 본 단계 범위 밖.
+3. Pretendard CDN 의존(오프라인/방화벽 시 시스템 폰트 폴백 동작 — 설계 의도대로 동작하나 글자 폭 미세 변동 가능).
+4. 360px 가로 스크롤: 고정폭 클래스 스캔에서 위험 요소 0건 확인했으나, 실기기 스크린 검증은 Phase 7 Tester 반응형 테스트에서 최종 확인 권장.
+
+---
+
+# 03 구현 보고: 랜딩페이지 신규 Phase 3-B (2026-11-04)
+
+작업자: wonbikok-developer / 범위: 플랜 §1-A (랜딩 일체 — 라우트·컨트롤러·BetaApplication·뷰·SEO) / PRD 13장·11.1 준거
+
+## 1. 생성/수정 파일 목록
+
+**신규 (18)**
+| 파일 | 내용 |
+|---|---|
+| `db/migrate/20261104000001_create_beta_applications.rb` | beta_applications 테이블 + [contact_type, contact_value] 인덱스(중복 최소 식별용) |
+| `app/models/beta_application.rb` | 암호화(encrypts deterministic)·검증(필수/선택/동의 분리)·연락처 정규화·with_contact 스코프 |
+| `app/controllers/landing_controller.rb` | show — 인증 시 /dashboard 303 리다이렉트, 비인증 랜딩 렌더(게이트 2종 skip, landing 레이아웃) |
+| `app/controllers/beta_applications_controller.rb` | new/create/done — rate_limit(10회/1시간), 중복 신청 정상 완료 처리, 422 시 landing/show 재렌더 |
+| `app/views/layouts/landing.html.erb` | 랜딩 전용 레이아웃 — SEO 메타(title/description/OG)·헤더(로고+CTA)·푸터(소개·문의만)·본문 바로가기 |
+| `app/views/landing/show.html.erb` | 10섹션 + 베타 폼 구성 |
+| `app/views/landing/_hero.html.erb` | 헤드라인 A형 + 설계 목표 각주 + 모바일 프레임 CSS 목업(role=img·aria-label) |
+| `app/views/landing/_problems.html.erb` | 페인 카드 3종 (13.3 문구 그대로) |
+| `app/views/landing/_solution.html.erb` | 월간 사이클 4스텝 + 소요 시간 배지 (PRD 5장 랜딩 버전) |
+| `app/views/landing/_features.html.erb` | 기능 3카드 + CSS 미니 목업, 현금영수증 "연동 준비 중" 병기 |
+| `app/views/landing/_regulation.html.erb` | 규제 안내 카피(13.3 그대로) + 국세청 링크(nts.go.kr) |
+| `app/views/landing/_demo.html.erb` | 정적 4스텝 모형(체크→알림톡 도착) + GIF 준비 중 안내 |
+| `app/views/landing/_social_proof.html.erb` | 파일럿 30곳 모집 배너 + 평생 50% 배지(후기 미확보 대체) |
+| `app/views/landing/_pricing.html.erb` | 2플랜 카드 + 월간/연간 토글(라디오+peer 변형, JS 0) + "파일럿 검증 전 가격" 각주 |
+| `app/views/landing/_plan_card.html.erb` | 11.1 표 기반 플랜 카드(지원/미지원 색+텍스트 병행) |
+| `app/views/landing/_faq.html.erb` | 8문답 details/summary 아코디언 + data-event="faq_open" |
+| `app/views/landing/_beta_form.html.erb` / `_final_cta.html.erb` | 신청 폼 섹션(id=beta) / 최종 CTA(cta_final) |
+| `app/views/beta_applications/_form.html.erb` / `new.html.erb` / `done.html.erb` | 신청 폼(필수/선택/동의 분리)·독립 페이지·완료 화면(SLA 문구 없음) |
+
+**수정 (10)**
+| 파일 | 변경 |
+|---|---|
+| `config/routes.rb` | `root "landing#show"` + `get "/dashboard"`(as: :dashboard) 이동 + `resources :beta_applications`(new/create/done) |
+| `app/controllers/sessions_controller.rb` | 로그인 성공 리다이렉트 root_path→dashboard_path(이동된 앱 홈 1회 리다이렉트 유지) |
+| `app/controllers/onboarding_controller.rb` | 온보딩 완료·완료자 우회 리다이렉트 root_path→dashboard_path(동일 사유) |
+| `app/views/layouts/application.html.erb` | 로고 링크·홈 탭(데스크톱/모바일) root_path→dashboard_path + 활성 판정 `"/"→"/dashboard"` (3-A가 남긴 이슈 #1 처리) |
+| `config/locales/ko.yml` | landing 네임스페이스(전 카피)·beta_applications·enums.student_count_range·activerecord 속성·accepted/invalid_email 메시지 추가, 기존 키 전부 유지 |
+| `test/controllers/sessions_controller_test.rb` | root_path→dashboard_path 1곳 |
+| `test/controllers/onboarding_controller_test.rb` | `get root_path`→`get dashboard_path` 1곳, assert 대상 root_path→dashboard_path 3곳 |
+| `test/integration/invoices_flow_smoke_test.rb` | assert 대상 root_path→dashboard_path 1곳 |
+| `db/schema.rb` | beta_applications 반영(마이그레이션 실행) |
+
+## 2. 라우트 변경 내역
+
+- 변경 전: `root "dashboard#show"` (루트 = 대시보드, 인증 게이트 경유 로그인 리다이렉트)
+- 변경 후: `root "landing#show"`(비인증 랜딩 렌더·인증 시 /dashboard 303) / `get "/dashboard", to: "dashboard#show", as: :dashboard`
+- 신규: `resource`스러운 `resources :beta_applications, only: %i[new create]` + collection `get :done`(PRG 패턴용 완료 화면)
+- 온보딩 게이트·인증 게이트는 Landing/BetaApplications 컨트롤러에서 skip(공개 페이지), dashboard는 기존 게이트 유지
+
+## 3. 테스트 수정 목록 (기계적 치환만, 로직 변경 없음)
+
+| 파일 | 위치 | 수정 |
+|---|---|---|
+| sessions_controller_test.rb | "로그인 성공 시…" assert | root_path → dashboard_path |
+| onboarding_controller_test.rb | CRITICAL-2 `get root_path` | get dashboard_path (앱 홈 진입점 치환) |
+| onboarding_controller_test.rb | 온보딩 완료자 2곳·연습 모든 완료 1곳 assert | root_path → dashboard_path |
+| invoices_flow_smoke_test.rb | log_in_as assert | root_path → dashboard_path |
+
+- 근거: 로그인·온보딩 완료 후 서버 리다이렉트 대상이 "앱 홈"이며 앱 홈이 `/`→`/dashboard`로 이동. 세션·온보딩 컨트롤러의 redirect_to 대상을 dashboard_path로 갱신하지 않으면 `/`→랜딩→`/dashboard` 2중 리다이렉트가 발생하므로 컨트롤러 1라인씩 동반 갱신(행위 동일·리다이렉트 1회 유지).
+
+## 4. Rule ID 준거 결과
+
+- **TEN-002**: BetaApplication에 주민번호·생년월일 등 금지 항목 필드 없음(이름·호칭·연락처·유형·선택 3항목·동의 2개만)
+- **TEN-003**: `encrypts :contact_value, deterministic: true`(User.phone_number와 동일 체계) — DB raw 값 암호문 확인, 화면 노출 없어 마스킹 불요
+- **TEN-006 준용**: IP·UA·추적 필드 미수집(폼 하단에 "부가 정보 미저장" 고지), 중복 감지는 contact 동등 조회 1회
+- **13.4**: '반나절→15분' 설계 목표 각주, 미제공 기능 "연동 준비 중"/"준비 중" 병기, 후기 대신 모집 배너, 인증마크 없음, 가산세는 사실 나열+안심 마무리
+- **13.8**: 푸터는 서비스 소개·문의 메일·© 1행뿐 — 사업자 정보·개인정보처리방침 등 미확정 법정 고지 미생성
+- **13.5**: 외부 스크립트 0, data-event만(cta_hero/cta_pricing/cta_final/faq_open/form_start/form_submit/form_error)
+
+## 5. 게이트·스모크 결과
+
+| 게이트 | 결과 |
+|---|---|
+| `bin/rails db:migrate` (dev·test) | 성공, schema.rb 반영 |
+| `bin/rails test` | **135 runs, 541 assertions, 0 failures, 0 errors** |
+| `bin/rubocop` | 89 files, no offenses |
+| `bin/brakeman` | 0 warnings |
+| `bin/rails tailwindcss:build` | 성공 (peer-checked/annual·has-checked·scroll-mt 등 랜딩 클래스 생성 확인) |
+| 스모크(dev 서버) | 비인증 `/` 200+카피·메타·data-event 검증 / 정상 제출 303→done 200 / 무동의·형식 오류 422+오류 요약(form_error) / 동일 연락처 재제출 303·레코드 미증가(중복 감지) / 전화 하이픈 정규화(01012345678) / 연락처 암호문 저장·복호화 일치 / 인증 `/`→303 `/dashboard`, 비인증 `/dashboard`→302 로그인 / 360px 가로 오버플로 0건(뷰포트 검사) / 브라우저 스크린샷 검증(모바일 히어로·폼·요금 토글·FAQ·푸터) |
+
+## 6. 결정 사항 (합리적 기본값)
+
+1. **중복 신청 처리**: `valid?` 통과 + contact 동등 조회 존재 시 새 레코드 없이 동일 완료 화면 303(13.6 "민감하게 노출하지 않는다"). deterministic 암호화가 조회를 가능케 함.
+2. **호칭·유형 저장 방식**: title/academy_type은 원문 문자열(원장님/교습소 등) 저장 — Tenant.business_type enum(한글 값) 선례 준수. student_count_range는 키 저장("1_15" 등, YAML 숫자 파싱 방지 위해 따옴표)+ko.yml 라벨.
+3. **rate limit**: Rails 8 내장 `rate_limit to: 10, within: 1.hour, only: :create, with: :rate_limited` — 초과 시 랜딩으로 alert 리다이렉트(429 대신 친화 안내). CAPTCHA 등 미도입(과투자 금지).
+4. **422 시 랜딩 전체 재렌더**: `render "landing/show", status: :unprocessable_entity` — 임베드 폼의 오류를 유지. 페이지 최상단에서 폼으로 스크롤이 자동 이동하지 않는 한계는 남김(§7-3).
+5. **요금 토글 JS 0 구현**: sr-only 라디오 2개 + named peer 변형. 1차 구현에서 라디오와 가격 그룹이 형제가 아니어서 토글이 카드에 적용되지 않는 버그를 브라우저 검증으로 발견 → 라디오·라벨·가격 그룹을 모두 형제로 배치해 수정(구조상 제약: Tailwind peer는 형제 결합자). display 유틸리티 충돌 회피 위해 표시 전환 래퍼(hidden/peer-checked:block)와 grid 내부 분리.
+6. **폼 배치**: 13.6 지시 옵션 중 "10 앞"(FAQ와 최종 CTA 사이). 최종 CTA 버튼은 #beta 앵커로 폼을 다시 노출.
+7. **목업 톤**: 알림톡 목업에 카카오 옐로 대신 토큰 색(중립·브랜드) 사용 — 16.0 색채 규율(주색 1) 유지. 목업에 표시되는 샘플 이름·금액도 ko.yml 관리.
+8. **문의 채널**: `support@wonbikok.kr` 플레이스홀더(ko.yml 1키) — 실제 운영 콘택트 확정 시 1키 교체. © 1행은 사업자 정보 아닌 서비스명 표기 수준으로 한정.
+9. **seo**: og:url/og:image는 도메인·에셋 미확정으로 생략(13장 확정 사항 명시적 허용 범위).
+10. **베타 폼 완료 문구**: "모집 진행 상황에 따라 안내드리겠습니다" — 시간 약속(SLA) 표현 배제.
+
+## 7. 남긴 이슈
+
+1. **베타 폼 신규 테스트 미작성**: 플랜 §5 위임표 기준 신규 테스트는 Phase 7 wonbikok-tester 몫(유효성·동의·암호화·중복). 본 단계는 기존 테스트 회귀 수정만 수행(완료 기준 #1 준수). 스모크로 동작은 검증 완료.
+2. **랜딩 헤더 CTA가 모바일 좁은 폭에서 길어질 수 있음**: 현재 360px 검증 통과(버튼 1행 유지), 실기기 확인은 Tester 반응형 테스트 권장.
+3. **422 재렌더 시 폼 위치로 자동 스크롤 없음**: 서버 렌더 한계 — 오류 요약 박스에 data-event="form_error" 마킹만. JS 도입 시 앵커 스크롤 보강 가능.
+4. **랜딩 폼 스팸 방지 수준**: IP 기반 rate limit만. 파일럿 모집 후 필요 시 hidden honeypot/CAPTCHA 검토.
+5. **docs 이슈**: PRD 13장 "구현 확정 사항"은 Phase 2에서 이미 반영됨(02_prd_update.md). 본 단계에서 추가 문서 변경 없음.
+
+---
+
+# 03 구현 보고: Phase 6 — Reviewer 지적 사항 최소 수정 (2026-11-04)
+
+> 05_review.md 지적 사항만 수정 (범위 외 변경 없음). Rule ID 준거: TEN-003 (CRITICAL-1·WARNING-2), 13.4 (WARNING-3), AGENTS.md 문구 관리 규칙 (WARNING-4), 15.4 (INFO-5).
+
+## 1. 수정 내역 (항목별)
+
+### [CRITICAL-1] 로그 평문 노출 차단 — TEN-003
+- `config/initializers/filter_parameter_logging.rb`: `filter_parameters`에 `:contact_value, :phone_number` 추가(부분 일치 마스킹). 베타 폼 `beta_application[contact_value]`와 기존 sessions/registrations `phone_number` 평문 로그를 동시 차단.
+- **스모크 검증**: dev 로그에서 `contact_value => "[FILTERED]"` 확인, 제출값 원문 0건.
+
+### [WARNING-2] 중복 신청 경쟁 조건 — TEN-003 준용·멱등성
+- `db/migrate/20261104000001_create_beta_applications.rb`: `[contact_type, contact_value]` 인덱스 `unique: true`로 변경. 주석에 title/academy_type 저장 방식 갱신(WARNING-4와 동반). 운영 데이터 없어 기존 마이그레이션 직접 수정.
+- `app/controllers/beta_applications_controller.rb`: save 경합 시 `ActiveRecord::RecordNotUnique` rescue → 완료 화면 303 멱등 종결(`save_idempotently` private 래퍼, "이미 신청" 노출 없음 유지).
+- **스모크 검증**: 정상 제출 303→done / 동일 연락처 재제출 303·레코드 1건 유지 / sqlite 직접 중복 INSERT → `UNIQUE constraint failed` 확인.
+
+### [WARNING-3] 현금영수증 "준비 중" 병기 — 13.4
+- `config/locales/ko.yml`: `landing.solution.step2_copy` 말미에 "(현금영수증 연동 준비 중)" 병기, `landing.pricing.plan_supported_pending: "지원 (연동 준비 중)"` 신설.
+- `app/views/landing/_pricing.html.erb`: 라이트·스탠다드 양 플랜의 현금영수증 행 값을 `plan_supported_pending`으로 교체(다른 "지원" 행은 유지).
+
+### [WARNING-4] 폼 옵션 라벨 ko.yml 통일 — AGENTS.md 문구 관리 규칙
+- `app/models/beta_application.rb`: `TITLE_OPTIONS = %w[principal teacher other]`, `ACADEMY_TYPE_OPTIONS = %w[academy study_room other]` — 한글 문자열 → 키 값 저장. `student_count_range`와 동일 패턴으로 통일(같은 폼 내 방식 혼재 해소).
+- `config/locales/ko.yml`: `enums.beta_application.title.*`, `enums.beta_application.academy_type.*` 라벨 매핑 추가(`tenant.business_type`의 `study_room: 공부방` 키 관례 준수).
+- `app/views/beta_applications/_form.html.erb`: 두 select를 키×라벨 map 방식으로 변경. 저장 데이터 없어 데이터 전환 불필요.
+- **스모크 검증**: 저장값 `principal`/`academy`/`1_15`(키), 렌더 옵션 `<option value="principal">원장님</option>` 등 한글 라벨 확인.
+
+### [INFO-5] 연락처 입력 접근성 — 15.4
+- `app/views/beta_applications/_form.html.erb`: 연락 수단 라디오 선택에 따라 단일 입력의 `inputmode`/`autocomplete`을 tel/email로 전환하는 미니 인라인 스크립트 추가(422 재렌더 시 phone 서버 선택 상태도 초기 반영).
+- **방식 선택**: 두 입력 CSS 전환은 숨김 input도 제출돼 params가 덮어쓰이는 문제(dom 순서 의존)가 있어 단일 입력 속성 전환 택함. CSP 이니셜라이저는 전부 주석 상태(비활성)라 인라인 스크립트 가능. Stimulus 도입 없음.
+
+### 미반영 (기록만 — 05_review.md 지적 유지)
+- **INFO-6**(`support@wonbikok.kr` 플레이스홀더): 실제 수신함 확정 시 1키 교체 예정 — 배포 전 체크리스트 항목. 코드 변경 없음.
+- **INFO-7**(invoices 뷰 직접 쿼리): 본 변경 범위 밖(기존 코드 유지분). W3 청구 확장 시 컨트롤러 이관.
+- **INFO-8**(allow_browser 완화): 현장 데이터 확보 전까지 `versions: :modern` 유지가 합리적(리뷰어도 합리적 선택으로 언급).
+- **INFO-9**(목업 "11월 원비" 월 표기): 실에셋 교체 시점에 함께 정리.
+
+## 2. 생성/수정 파일 목록 (Phase 6)
+
+| 파일 | 변경 |
 |:---|:---|
-| db/migrate/20261020000010_add_message_logs_dispatch_uniqueness.rb (신규) | [C1] message_logs [invoice_id, template_type] partial unique index(where resend_of_id IS NULL) — MSG-001 DB 강제 |
-| app/services/notifications/dispatcher.rb | [C1] 건별 requires_new savepoint + ActiveRecord::RecordNotUnique rescue → duplicated. Result에 dispatched_invoice_ids 추가 |
-| app/services/reminders/scheduler.rb | [C2] due_stage_for — d3는 경과일 ≥ 3일만(1~2일 nil), d7·month_end 기존 판정 유지 |
-| config/recurring.yml | [C3] monthly_invoice_generation `0 7 1 * *`, reminder_dispatch `0 9 * * *` — 전부 Fugit::Cron 확인 |
-| app/jobs/message_send_job.rb | [C4] perform 초반 Invoice CANCELLED 가드 → FAILED(INVOICE_CANCELLED) |
-| app/controllers/invoices_controller.rb | [C4] resend 상태 검증(SENT/UNPAID/OVERDUE만) [C5] send_batch 선반영 제거 — 실제 큐 등록 건(dispatched_invoice_ids)만 mark_sent!, 예약 시각 파싱 실패 시 즉시발송 변질 차단 [W10/W11] |
-| app/models/invoice.rb | [W6] adjust! DRAFT/READY만 허용 [W7] cancel! 빈 사유 errors.add+false(raise 제거) + QUEUED 로그 연쇄 취소(잡 discard + FAILED) |
-| app/models/message_log.rb | [W8] has_many :resends FK resend_of_id 수정 |
-| app/jobs/reminder_dispatch_job.rb | [W12] defined? 사코드 가드 제거 |
-| db/migrate/20261020000007_create_message_logs.rb | [W12] template_type 주석 갱신(단계 기반 값) |
-| config/locales/ko.yml | invoices.errors.{resend_not_allowed, not_editable, invalid_send_at} + messages.errors.invoice_cancelled 추가 |
-| app/controllers/invoices_controller.rb (edit) | [W6] SENT 이후·취소 청구 수정 화면 진입 차단 |
+| config/initializers/filter_parameter_logging.rb | CRITICAL-1 |
+| db/migrate/20261104000001_create_beta_applications.rb | WARNING-2 (+주석 갱신) |
+| app/controllers/beta_applications_controller.rb | WARNING-2 |
+| config/locales/ko.yml | WARNING-3·4 |
+| app/views/landing/_pricing.html.erb | WARNING-3 |
+| app/models/beta_application.rb | WARNING-4 |
+| app/views/beta_applications/_form.html.erb | WARNING-4·INFO-5 |
+| db/schema.rb | unique: true 반영 |
 
-## 이슈 9(MSG-005 per-tenant 발신 표기)
+## 3. 게이트·검증 결과
 
-코드 수정 대상 아님(리뷰 권고 사항) — 원장별 카카오채널/발신번호 연동은 P1 과제로 유지. PRD 14장 명시는 오케스트레이터 확인 필요.
+| 항목 | 결과 |
+|:---|:---|
+| `bin/rails db:migrate` (dev) | 성공 — rollback→re-migrate, dev DB `CREATE UNIQUE INDEX` 확인 |
+| `RAILS_ENV=test bin/rails db:migrate` | 성공(exit 0) — 단, test DB는 schema_sha1 메타에 따라 schema.rb에서 구성되므로 `db:test:prepare`로 재구성(§4 참조) |
+| db/schema.rb | `unique: true` 반영, prepare 후 체크섬 불변 확인 |
+| `bin/rubocop` | 89 files inspected, no offenses |
+| `bin/brakeman` | No warnings found |
+| `bin/rails test` | **135 runs, 541 assertions, 0 failures, 0 errors, 0 skips** (기존 135건 회귀 없음) |
+| 스모크(dev 서버 :3100, curl) | 정상 제출 303→done / 중복 재제출 303→done·레코드 1건 / sqlite 중복 INSERT → UNIQUE constraint failed / 로그 `contact_value => "[FILTERED]"`·원문 0건 / 옵션 키 저장+한글 라벨 렌더 / "연동 준비 중" 6곳 렌더 / INFO-5 스크립트 렌더(라인 850+) |
+| 정리 | 스모크 레코드 삭제(dev beta_applications 0건), 서버 종료·pid 제거 |
 
-## 참고(회귀 수정)
+## 4. 결정 사항 / 트러블슈팅 기록
 
-cancel!의 transaction 블록이 find_each(nil)을 반환해 성공 경로가 falsy가 되는 문제를 블록 후 `true` 반환으로 보정(스모크 테스트 1건이 잠깐 적발 — 최종 전 건 통과).
-
-## Phase 6-2 — W2 테스트 발견 버그 수정 (W2Fix2Dev / 2026-10-20)
-
-### BUG-1 [MSG-003] 자동 재시도가 실질 2회 실행됨
-- 파일: app/jobs/message_send_job.rb (handle_retry_or_fail)
-- 수정: `executions <= MAX_AUTO_RETRIES` → `executions < MAX_AUTO_RETRIES`. ActiveJob은 재시도 시점에 executions를 증가시키므로 1차 실행(executions=0)만 재시도 큐에 등록되고 2차(executions=1)에서 FAILED 확정 — PRD MSG-003 "재시도 상한 1회"와 일치.
-
-### BUG-2 [INV-002] 422 재렌더 시 Template::Error(500)
-- 파일: app/models/invoice.rb
-- 수정: `attr_accessor :change_reason` 추가. edit.html.erb의 `f.text_field :change_reason`가 READY 청구 422 재렌더 시 바인딩할 가상 어트리뷰트가 없어 발생한 오류. 컨트롤러는 `invoice_params[:change_reason]`(params.expect에 이미 포함)로 adjust!에 전달하므로 기존 파라미터 경로와 정합.
-
-### 검증
-- 재현 테스트 2건 테스트 파일 변경 없이 통과
-- `bin/rails test`: 135 runs, 541 assertions, 0 failures, 0 errors
-- `bin/rubocop`: 85 files no offenses / `bin/brakeman`: No warnings
+1. **test DB 재구성 절차**: dev migrate 직후 `RAILS_ENV=test bin/rails db:migrate`가 스테일한 test DB(구 non-unique 인덱스)에서 schema.rb를 재덤프해 `unique: true`를 덮어쓰는 문제 발견 → 순서 확정: ① dev `db:schema:dump` ② 스테일 병렬 샤드(`storage/test.sqlite3_0..7`) 삭제 ③ `bin/rails db:test:prepare` ④ 체크섬으로 schema.rb 불변 확인. 향후 마이그레이션 변경 시 동일 절차 권장.
+2. **INFO-5 방식**: 위 §1 참조(두 입력 전환의 params 덮어쓰기 문제로 미니 인라인 스크립트 선택). no-JS 환경에서는 서버 기본값(email 힌트) 유지.
+3. **RecordNotUnique rescue 경로**: 정상 중복은 `duplicate_submission?`(exists?)가 먼저 흡수하므로 rescue는 동시 제출 경합 전용. 단일 스레드 스모크로는 exists? 경로가 발동 — rescue 분기는 유니크 제약 실증(sqlite INSERT 실패)으로 정합성 확인.

@@ -1,104 +1,75 @@
-# W2 플랜 — 월간 청구·납부 안내(F3) + 솔라피 알림톡 + 미납 리마인더(F6)
+# 플랜: 랜딩페이지 신규 제작 + 전체 퍼블리싱 리디자인 (2026-11-04)
 
-- 작성: 오케스트레이터 / 2026-10-20
-- pipelineType: **full** (신규 엔티티 2종, 외부 연동 1종, 마이그레이션 3건, 배치 잡 3종, ~35파일)
-- PRD 근거: 7장 F3·F6, 9.3 메시지 상태, 10.2 솔라피, 14장, 18.1 W2, 22장 Rule ID
-
-## 0. 컨텍스트 확인 결과
-
-- `progress.json`: null → 신규 / git: clean (최종 푸시 5a5296d)
-- `_workspace/` → W1 산출물 6건을 `_workspace_prev/`로 이동 완료 (W2 이관 과제는 05_review.md에 보존됨)
-- Invoice/MessageLog 관련 코드 없음, `config/recurring.yml` 스캐폴드 존재, app/services·app/jobs 구조 준비됨
+**모드**: 일반 (`/wonbikok_orchestrator`) — wonbikok-developer / reviewer / tester
+**규모**: Full (신규 라우트+컨트롤러+뷰, 마이그레이션 1건, 전 뷰 리디자인 26파일+, 레이아웃·디자인 시스템 재구축)
 
 ## 1. 작업 범위
 
-### F3. 월간 청구 & 납부 안내 (PRD 7장 F3)
+### A. 랜딩페이지 신규 (PRD 13장 — W3 병행 트랙 조기 착수)
 
-- **Invoice 모델**: tenant/student FK, target_month(예: "2026-11"), 원생명·기본 원비 **스냅샷**(TEN-004), adjustment_amount(할인/할증)·adjustment_note(비고), due_on(원생 payment_day 기반 당월 기한), status — PRD 9.1: DRAFT/READY/SENT/UNPAID/OVERDUE/CANCELLED (PARTIALLY_PAID·PAID는 W3 수납 도입 시 활성). **유니크 [student_id, target_month]** (INV-001, 모델 검증+DB 인덱스)
-- **자동 생성**: 매월 1일 배치(Solid Queue recurring) + 원장 수동 트리거("이번 달 청구 만들기"). `Student.active`만 대상(INV-004). 중복 실행 시 미처리 건만(멱등)
-- **미리보기 → 확정**: 총 청구액·대상 인원·원생별 금액 확인 후 DRAFT→READY(INV-006). 제외 원생은 사유 기록
-- **개별 조정**: DRAFT에서 조정액·비고 수정 자유 / READY 이후 수정은 변경 사유 기록(INV-002)
-- **발송**: READY 청구 대상 알림톡(솔라피) 즉시/예약 발송, 발송 시 SENT. 예약은 취소 가능·대기열 표시(MSG-007). 본문: 원생명·청구월·금액·납부 계좌·기한·문의(원장 전화) — **청구 링크(F9)는 W3이므로 본문만으로 납부 완결**(PRD 원칙)
-- **발송 결과**: 성공/실패 목록 + 실패 사유, '다시 보내기'(명시 액션 — 이력 기록, MSG-001/006)
-- **취소**: CANCELLED 전이 — 수납 합계 제외는 W3부터 실질 적용(INV-003)
+- **라우트**: `root` → `landing#show`로 변경. 기존 `root "dashboard#show"`는 `get "/dashboard"`로 이동.
+  - LandingController: 비인증 → 랜딩 렌더, 인증 원장 → `/dashboard` 리다이렉트.
+- **뷰**: 13.2 IA 10섹션 단일 스크롤 (히어로/문제공감 3카드/해결 4스텝/핵심기능 3카드/규제안내/사용시연/사회적증거=파일럿 모집 배너/요금제 2플랜+연간토글/FAQ 8문답(13.3 시안)/최종 CTA+푸터).
+- **카피**: 13.3 시안 그대로 (히어로 A형 기본). 13.4 톤 원칙 준수(공포마케팅 금지, 검증 전 수치 "설계 목표" 표기, 미제공 기능 "준비 중").
+- **베타 신청 폼 (13.6)**: `BetaApplication` 모델 신규 + 마이그레이션.
+  - 필수: 원장 이름·호칭, 연락 수단(이메일 또는 전화), 교습소 유형 / 선택: 원생 수 구간, 관리 방식, 가장 불편한 업무 / 필수 동의: 개인정보 수집·이용 (마케팅 수신 분리·선택).
+  - 연락처는 Active Record Encryption 암호화 저장 (TEN-003 원칙 준용). 주민번호·불필요 정보 수집 금지 (TEN-002 준용).
+  - 서버·클라이언트 양측 유효성 검증, 성공 상태 안내. 중복 신청 감지(최소 식별)는 노출하지 않게.
+- **SEO 메타 (13.7)**: title 기본값(13.2), description, Open Graph. 실제 URL 미확정이므로 og:url 등 도메인 의존 항목은 생략.
+- **트래킹 (13.5)**: 외부 분석 스크립트 미삽입(개인정보 최소화). `data-event` 속성 마크업만으로 이벤트 지점 확보 → 분석 도구 도입은 후속.
+- **에셋 대체 방침**: 로고/제품 스크린샷/시연 GIF 부재 → CSS·SVG 목업과 플레이스홀더(의미 있는 alt 필수), 실에셋 확보 후 교체. 시연 섹션은 정적 4스텝 모형. 푸터 법정 고지는 준비된 것만(임의 생성 금지, 13.8) — 문의 채널·서비스 소개만.
 
-### 솔라피 연동 (PRD 10.2)
+### B. 전체 앱 퍼블리싱 리디자인 (PRD 16장)
 
-- **Solapi::Client** (app/services/solapi/): Messages v4 API. HMAC-SHA256 인증(api_key·api_secret — credentials), 알림톡+**대체발송(SMS/LMS) 단일 요청**(MSG-002 — 솔라피 대체발송 설정 활용), 응답(messageId/groupId·상태코드) 기반 상태 기록. 타임아웃·오류 코드 매핑
-- **MessageLog**: tenant/invoice/student FK, channel(alimtalk/sms), template_type(invoice_notice/reminder_soft/reminder_standard/reminder_formal), status(QUEUED/SENDING/SENT/FAILED/FALLBACK_SENT/SIMULATED — PRD 9.3), provider_message_id, error_code·message, sent_at, resend_of(재발송 이력 연결). **발송 유일성 [invoice_id, template_type] — resend 플래그 예외**(MSG-001)
-- **MSG-003**: 자동 재시도 상한 1회
-- **연습 모드**: practice 테넌트는 실호출 없이 SIMULATED 기록(기존 전제 유지)
-- **credentials**: solapi.api_key·api_secret — 미설정 시 발송 시도는 SIMULATED 처리 + 설정 안내 표시
+- **디자인 토큰**: `tailwind.config.js` 신규 생성 — 브랜드 컬러(16.1: #3478F6), 배경 #F7F9FC, 텍스트 #191F28/#667085, 성공/주의/오류, 4px 간격 계열, 중간 라운드 카드, tabular-nums.
+- **폰트**: Pretendard (CDN + 시스템 폰트 폴백 스택).
+- **공통 컴포넌트 파셜** (`app/views/shared/`): 버튼(primary/secondary/destructive — 라벨은 동작 설명형), 카드, 상태 배지(16.2 체계: 색상+텍스트 병행), 폼 필드(라벨+에러+도움말), 빈 상태, 페이지 헤더, 플래시.
+- **앱 셸**: 상단 헤더 개선 + 모바일 하단 탭 내비게이션(홈/원생/청구/알림 — 레퍼런스: 미니스탁·캐시노트), 데스크톱 폭 제한 레이아웃. 최소 터치 영역 44px, 대비 확보(40~60대 접근성 16.0).
+- **대상 뷰 26파일 전면 리디자인**: sessions/registrations/onboarding(4)/students(7)/invoices(4)/reminders(4)/dashboard(1) + layouts. 로직·라우팅·모델 변경 없이 마크업·클래스만(예외: root 라우트 이동).
+- **반응형**: 모바일 360px 우선 검증(가로 스크롤 금지) ~ 데스크톱. 랜딩은 데스크톱·모바일 병행(max-w-6xl), 앱은 모바일 퍼스트.
+- **16.4 체크리스트** 준수: 우선 CTA 명확성, 금액·기한·상태 표시 형식 일관, 빈/로딩/오류 화면 설계.
 
-### F6. 미납 리마인더 (PRD 7장 F6)
+### 제외
 
-- **미납 판정(W2 임시 규칙)**: 발송 완료(SENT) & due_on 경과 & 완납 기록 없음 — Payment 도입(W3) 시 완납 반영으로 확장. **취소 청구 제외**(INV-003)
-- **자동 스케줄**: D+3/D+7/월말 D-1, 단계별 ON/OFF + 발송 시각 설정(기본 오전 9시, 야간 발송 금지 — MSG-006). 매일 오전 리마인더 디스패처 배치가 대상 판정·발송
-- **템플릿 3종**: 부드러움/표준/공식 + 원장 커스텀 문구 저장, 원생별 발송 톤 선택 — 리마인더 발신자 표기는 원장 상호·연락처 포함(MSG-005)
-- **제외 설정**: 원생별 리마인더 제외 → 즉시 자동 발송 배제(MSG-004) — students 컬럼 추가
-- **개입**: 미납 목록 뷰(원생·금액·경과일·발송 이력), 선택 즉시 발송(수신자·내용 미리보기), 발송 중단
+- 관리자 콘솔(W4 미착수), 학부모 청구 링크(W3 F9), 분석 도구 실연동, 실제 디자인 에셋 제작, A/B 테스트 인프라.
 
-### 배치 (config/recurring.yml)
+## 2. 대상 파일
 
-1. `monthly_invoice_generation` — 매월 1일 07:00, 전 테넌트 청구 초안 생성
-2. `reminder_dispatch` — 매일 09:00, D+3/D+7/월말 D-1 대상 발송
+**신규**: `config/routes.rb`(수정), `app/controllers/landing_controller.rb`, `app/controllers/beta_applications_controller.rb`, `app/models/beta_application.rb`, `db/migrate/xxx_create_beta_applications.rb`, `app/views/landing/*`(섹션 파셜 구성), `app/views/beta_applications/*`(폼·완료), `tailwind.config.js`, `app/views/shared/*`(컴포넌트 파셜), `config/locales/ko.yml`(랜딩 카피 — 하드코딩 금지 규칙 준수).
+**수정**: `app/views/layouts/application.html.erb`(앱 셸 재구축), 기존 뷰 26파일, `app/controllers/dashboard_controller.rb`(라우트 이동 무관하나 확인), `db/schema.rb`.
+**테스트**: 기존 시스템/통합 테스트 중 `root_path` 의존 수정 + 랜딩 폼 신규 테스트.
 
-### W1 후속 정리 3건 (W1 리뷰가 W2 과제로 기록)
+## 3. Rule ID
 
-1. 미완료 온보딩 테넌트의 `/students` 등 직접 접근 차단 게이트
-2. 로그아웃 시 세션의 CSV 오류내역 캐시 키 제거
-3. 온보딩 스텝 1(계좌) presence 검증 보완(WARNING-7 잔여)
-※ CSV confirm 컬럼·중복검사 성능(WARNING-8/9)은 유지보수 이슈로 유지(미포함)
+- **TEN-002** (주민번호 수집 금지 — 베타 폼 필드 설계), **TEN-003** (식별정보 암호화·마스킹 — BetaApplication 연락처), **TEN-006 준용** (기록 최소화).
+- **16.2 상태 배지 체계**·**16.4 검수 체크리스트** — 리디자인 준거.
+- **13.4 카피 원칙** — 랜딩 문구 검증 기준.
+- 기존 INV/PAY/MSG/CR 로직 불변 (뷰 마크업만 변경).
 
-## 2. 대상 파일 (~35)
+## 4. PRD/AGENTS.md 수정 필요 항목 (Phase 2)
 
-| 레이어 | 파일 |
-|:---|:---|
-| 마이그레이션 3 | create_invoices / create_message_logs / tenants(리마인더 설정 4컬럼)+students(excluded_from_reminders) |
-| 모델 | invoice, message_log + student/tenant 스코프·설정 |
-| 서비스 | solapi/client, solapi/message_builder(템플릿 치환), invoices/generator(배치·수동 공용), reminders/scheduler(대상 판정), notifications/dispatcher(발송 오케스트레이션 — 유일성·대체발송·재시도 1회) |
-| 잡 | monthly_invoice_generation_job, reminder_dispatch_job, message_send_job |
-| 컨트롤러 | invoices_controller(생성/미리보기/확정/조정/취소/발송/결과), reminders_controller(설정/미납 목록/즉시발송/제외) |
-| 뷰 | invoices(목록/미리보기/결과), reminders(설정/미납 목록/이력) ~12 |
-| 설정 | config/recurring.yml, routes, ko.yml, credentials(solapi 키 주석 가이드) |
-| 테스트 | Phase 7 (Tester) |
+- PRD 13장에 "구현 확정 사항(2026-11-04)" 추가: 루트 결정(/=랜딩, /dashboard 이동), BetaApplication 스키마, 트래킹 최소 범위(data-event 마크업, 외부 스크립트 제외), 에셋 목업 대체 방침, Pretendard 채택. 버전 v2.2→v2.3.
+- AGENTS.md: 진행 상황 표에 병행 트랙(랜딩·퍼블리싱) 행 추가.
 
-## 3. Rule ID 목록 (22장)
+## 5. 위임 계획
 
-- **INV-001**(중복 청구 금지), **INV-002**(확정 후 수정 사유), **INV-003**(취소 수납합계 제외 — W3 실질), **INV-004**(휴원·퇴원 제외 — W1 스코프 재사용), **INV-006**(미리보기·발송 전 수정)
-- **MSG-001**(발송 유일성+재발송 예외 이력), **MSG-002**(알림톡 실패 시 SMS 대체), **MSG-003**(재시도 상한), **MSG-004**(제외 즉시 배제), **MSG-005**(원장 발신 표기), **MSG-006**(야간 금지·기본 오전 9~10시), **MSG-007**(예약 취소·대기열 표시)
-- **TEN-001**(격리), **TEN-004**(청구 스냅샷)
-- 미포함 명시: INV-005(부분납·W3), PAY 도메인(W3), 발행 안내 알림톡(W3 CR)
+| Phase | 위임 | 지시 요약 |
+|---|---|---|
+| 2 | 오케스트레이터 | PRD 13장 구현 확정 사항 + AGENTS.md 표 갱신 |
+| 3-A | wonbikok-developer | 디자인 시스템(토큰·파셜·앱셸) + 기존 26 뷰 리디자인. `_workspace/01_plan.md`, `01a_uibowl_references.md` 참조. 산출물 `03_implementation.md` |
+| 3-B | wonbikok-developer | 랜딩페이지 일체(라우트·컨트롤러·BetaApplication·뷰·SEO). 3-A 종료 후 순차 실행. 산출물 `03_implementation.md` 갱신 |
+| 4 | 오케스트레이터 | rubocop 0에러 + brakeman 0경고 + rails test |
+| 5 | wonbikok-reviewer | 뷰·폼 보안(스팸·개인정보), TEN-002/003, 16.4 체크리스트, 반응형·접근성 준수 검증. `05_review.md` |
+| 6 | wonbikok-developer | 리뷰 지적 최소 수정 |
+| 7 | wonbikok-tester | 기존 테스트 회귀(라우트 변경 대응 포함) + 랜딩 폼 테스트(유효성·동의·암호화) + 반응형 시스템 테스트. `07_test_report.md` |
+| 8 | 오케스트레이터 | bin/dev 부트 + 랜딩/대시보드/주요 화면 렌더 확인 |
+| 9 | 오케스트레이터 | 완료 보고 + AGENTS.md 갱신 + progress.json 리셋 |
 
-## 4. PRD/AGENTS.md 수정 필요 (Phase 2)
+## 6. 리스크
 
-- **PRD.md**: v2.1→v2.2, 14장에 W2 확정 사항(Invoice 스냅샷 필드 구성, MessageLog 채널·상태·resend_of, 솔라피 응답 기반 상태, W2 미납 임시 판정 규칙, 리마인더 설정 컬럼), F3에 '링크 없는 본문 발송(W2)→링크 추가(W3)' 경계 명시
-- **AGENTS.md**: W2 → 🔄 진행 중
-
-## 5. 에이전트 스폰 계획
-
-| Phase | 에이전트 | 지시 |
-|:---|:---|:---|
-| 3-1 | Developer (신규) | F3+솔라피: 마이그레이션·Invoice·Solapi::Client·발송 파이프라인(유일성·대체발송·재시도)·배치 2종·청구 화면 |
-| 3-2 | Developer (신규) | F6: 리마인더 스케줄러·설정 화면·미납 목록·제외·즉시발송 + W1 후속 3건 |
-| 4 | 오케스트레이터 | rubocop/brakeman/rails test |
-| 5 | Reviewer (신규) | 중점: MSG-001 유일성·MSG-002 대체발송·MSG-003 상한·INV-001/002·TEN-001/004·배치 멱등 |
-| 6 | Developer (신규, 필요 시) | 지적 최소 수정 |
-| 7 | Tester (신규) | 위 시나리오 기반 (외부 API 스텁 필수) |
-| 8 | 오케스트레이터 | 부트 검증 (절대경 Ruby 기동 — W1 런레포트 레시피) |
-
-## 6. 리스크·모호점
-
-1. **실발송 검증(W2 완료 기준)**: 솔라피 API 키·카카오채널 알림톡 템플릿 심사가 **운영 준비물**(사용자 선행 작업). 개발은 스텁/시뮬레이션으로 완결하고, 키 주입 후 실발송 1건 스모크는 별도 단계(유료 발송이므로 사용자 확인 필요)
-2. **알림톡 템플릿 코드**: 카카오 사전등록 템플릿 필요 — 코드 파라미터 구조만 구현, 실제 템플릿 ID는 운영 주입
-3. **미납 판정**: Payment 부재로 W2 임시 규칙(기한 경과·무완납 기록) — W3에서 확장
-4. **솔라피 응답 비동기성**: 발송 요청 응답만으로 최종 전달 보장 없음 — W2는 요청 응답 기반 상태, 수신 리포트 폴링/웹훅은 P1
-
-## 7. 완료 기준 (PRD 18.1 W2)
-
-- [ ] 이번 달 청구 초안 생성(배치·수동) → 미리보기 → 확정 → 발송 흐름 동작
-- [ ] 알림톡 발송 파이프라인 완성(유일성·SMS 대체·재시도 1회·이력) — 스텁/시뮬레이션 검증
-- [ ] 리마인더 D+3/D+7/월말 자동 판정·발송, 제외 즉시 배제, 3종 템플릿
-- [ ] 연습 모드에서 외부 호출 0건(SIMULATED)
-- [ ] 품질 게이트 통과 + 리뷰 APPROVED
-- [ ] (운영 준비물 충족 시) 실발송 1건 스모크 — 별도 확인 단계
+1. **root 라우트 변경** → 기존 테스트·링크 실패 가능 (Tester에서 일괄 수정).
+2. **전 뷰 리디자인** → 시스템 테스트 셀렉터 파손 가능 (마크업 유지보다 접근성 우선, 테스트 수정 허용).
+3. **Pretendard CDN** 오프라인 환경 → 시스템 폰트 폴백 스택 필수.
+4. **랜딩 폼 스팸** → 기본 rate limit만(과투자 금지, 파일럿 전).
+5. **디자인 에셋 부재** → 목업으로 출시 품질 미달 구간 존재(시연·스크린샷) — 실에셋 후속 교체 전제.
+6. 퍼블리싱 대규모 위임 1회(3-A) 분량 리스크 → Developer가 섹션별 우선순위(앱셸→폼→목록→상세) 순 진행.
