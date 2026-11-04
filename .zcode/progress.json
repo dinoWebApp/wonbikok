@@ -1,7 +1,60 @@
 {
-  "domain": null,
+  "domain": "publishing-redesign-v2",
   "currentPhase": null,
-  "pipelineType": null,
-  "phaseHistory": [],
-  "lastUpdated": "2026-11-04T15:30:00+09:00"
+  "pipelineType": "full",
+  "mode": "lite",
+  "phaseHistory": [
+    {
+      "phase": "0",
+      "status": "completed",
+      "note": "컨텍스트 확인 — workspace 롤오버(_workspace_prev/_workspace/), git clean"
+    },
+    {
+      "phase": "1",
+      "status": "completed",
+      "note": "요구사항 분석 — uibowl 2차 조사, 방향 기본안=웜 오렌지 에디토리얼, 01_plan.md"
+    },
+    {
+      "phase": "approval",
+      "status": "completed",
+      "note": "사용자 승인 (웜 오렌지 기본안 확정)"
+    },
+    {
+      "phase": "2",
+      "status": "completed",
+      "note": "PRD.md v2.4 — 16.1 웜 오렌지 토큰 재정의, 16.3 uibowl 2차 조사 추가, 02_prd_update.md"
+    },
+    {
+      "phase": "3",
+      "status": "completed",
+      "note": "developer-lite 구현 — 소스 20파일(+60/-56), 토큰·레이아웃·shared·랜딩·앱 화면, grep 청색 0건"
+    },
+    {
+      "phase": "4",
+      "status": "completed",
+      "note": "rubocop 0 에러 / brakeman 0 경고 / test 170건 0 실패 — 오케스트레이터 직접 재검증"
+    },
+    {
+      "phase": "5",
+      "status": "completed",
+      "note": "reviewer-lite APPROVED — 9/9 체크 통과, WARNING 1건(배지 아이콘 선택 사양, 조치 불요), Phase 6 생략"
+    },
+    {
+      "phase": "7",
+      "status": "completed",
+      "note": "tester-lite — 170 runs 0 실패, CSS 셀렉터 의존 0건, 테스트 수정 불요"
+    },
+    {
+      "phase": "8",
+      "status": "completed",
+      "note": "Puma 부트 정상, / 200·/session/new 200·/dashboard 302, 오류 키워드 0건"
+    },
+    {
+      "phase": "9",
+      "status": "completed",
+      "note": "AGENTS.md 진행 표 추가, memory 갱신, 완료 보고 — 커밋은 git-deploy 스킬 절차로 사용자 확인 대기"
+    }
+  ],
+  "awaitingApprovalPlan": "_workspace/01_plan.md",
+  "lastUpdated": "2026-11-04T17:55:00+09:00"
 }

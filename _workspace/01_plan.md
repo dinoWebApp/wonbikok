@@ -1,75 +1,118 @@
-# 플랜: 랜딩페이지 신규 제작 + 전체 퍼블리싱 리디자인 (2026-11-04)
+# 01_plan.md — 전체 퍼블리싱 재구성 (uibowl 레퍼런스 2차)
 
-**모드**: 일반 (`/wonbikok_orchestrator`) — wonbikok-developer / reviewer / tester
-**규모**: Full (신규 라우트+컨트롤러+뷰, 마이그레이션 1건, 전 뷰 리디자인 26파일+, 레이아웃·디자인 시스템 재구축)
+- 작성일: 2026-11-04
+- 모드: 절약 (`/wonbikok_orchestrator_lite`) — lite 프로필 위임
+- 파이프라인: Full (0→1→✋→2→3→4→5→6?→7→8→9), 직렬 단일 작업 (병렬 배치 부적합 —
+  `tailwind.config.js`·`application.css` 공통 클래스·`shared/` 파셜이 전 영역 공유 파일이므로)
 
-## 1. 작업 범위
+## 1. 요구사항
 
-### A. 랜딩페이지 신규 (PRD 13장 — W3 병행 트랙 조기 착수)
+사용자: "현재 전체 퍼블리싱이 마음에 들지 않습니다. uibowl mcp를 사용하여 전체 퍼블리싱을 재구성해주세요."
 
-- **라우트**: `root` → `landing#show`로 변경. 기존 `root "dashboard#show"`는 `get "/dashboard"`로 이동.
-  - LandingController: 비인증 → 랜딩 렌더, 인증 원장 → `/dashboard` 리다이렉트.
-- **뷰**: 13.2 IA 10섹션 단일 스크롤 (히어로/문제공감 3카드/해결 4스텝/핵심기능 3카드/규제안내/사용시연/사회적증거=파일럿 모집 배너/요금제 2플랜+연간토글/FAQ 8문답(13.3 시안)/최종 CTA+푸터).
-- **카피**: 13.3 시안 그대로 (히어로 A형 기본). 13.4 톤 원칙 준수(공포마케팅 금지, 검증 전 수치 "설계 목표" 표기, 미제공 기능 "준비 중").
-- **베타 신청 폼 (13.6)**: `BetaApplication` 모델 신규 + 마이그레이션.
-  - 필수: 원장 이름·호칭, 연락 수단(이메일 또는 전화), 교습소 유형 / 선택: 원생 수 구간, 관리 방식, 가장 불편한 업무 / 필수 동의: 개인정보 수집·이용 (마케팅 수신 분리·선택).
-  - 연락처는 Active Record Encryption 암호화 저장 (TEN-003 원칙 준용). 주민번호·불필요 정보 수집 금지 (TEN-002 준용).
-  - 서버·클라이언트 양측 유효성 검증, 성공 상태 안내. 중복 신청 감지(최소 식별)는 노출하지 않게.
-- **SEO 메타 (13.7)**: title 기본값(13.2), description, Open Graph. 실제 URL 미확정이므로 og:url 등 도메인 의존 항목은 생략.
-- **트래킹 (13.5)**: 외부 분석 스크립트 미삽입(개인정보 최소화). `data-event` 속성 마크업만으로 이벤트 지점 확보 → 분석 도구 도입은 후속.
-- **에셋 대체 방침**: 로고/제품 스크린샷/시연 GIF 부재 → CSS·SVG 목업과 플레이스홀더(의미 있는 alt 필수), 실에셋 확보 후 교체. 시연 섹션은 정적 4스텝 모형. 푸터 법정 고지는 준비된 것만(임의 생성 금지, 13.8) — 문의 채널·서비스 소개만.
+- 직전 작업(2026-11-04 완료, `_workspace_prev/_workspace/`)에서 적용한 "토스풍 화이트+청색
+  미니멀" 스타일이 마음에 들지 않다는 것. 동일한 절제 원칙의 마이너 보정이 아니라
+  **비주얼 방향의 전면 교체**가 요구 사항.
+- 재구성 범위: "전체" — 랜딩페이지 10섹션 + 원장 앱 전체(대시보드·원생·청구·리마인더·
+  온보딩·로그인·가입) + 공통 레이아웃·공통 컴포넌트.
+- 승인 게이트에서 방향 확정 전환 허용: 아래 기본안(웜 오렌지)에 대한 사용자 변경 요청이
+  있으면 토큰표만 교체하여 동일 파이프라인 진행.
 
-### B. 전체 앱 퍼블리싱 리디자인 (PRD 16장)
+## 2. uibowl 레퍼런스 (2026-11-04 2차 조사, 오케스트레이터 직접 수행)
 
-- **디자인 토큰**: `tailwind.config.js` 신규 생성 — 브랜드 컬러(16.1: #3478F6), 배경 #F7F9FC, 텍스트 #191F28/#667085, 성공/주의/오류, 4px 간격 계열, 중간 라운드 카드, tabular-nums.
-- **폰트**: Pretendard (CDN + 시스템 폰트 폴백 스택).
-- **공통 컴포넌트 파셜** (`app/views/shared/`): 버튼(primary/secondary/destructive — 라벨은 동작 설명형), 카드, 상태 배지(16.2 체계: 색상+텍스트 병행), 폼 필드(라벨+에러+도움말), 빈 상태, 페이지 헤더, 플래시.
-- **앱 셸**: 상단 헤더 개선 + 모바일 하단 탭 내비게이션(홈/원생/청구/알림 — 레퍼런스: 미니스탁·캐시노트), 데스크톱 폭 제한 레이아웃. 최소 터치 영역 44px, 대비 확보(40~60대 접근성 16.0).
-- **대상 뷰 26파일 전면 리디자인**: sessions/registrations/onboarding(4)/students(7)/invoices(4)/reminders(4)/dashboard(1) + layouts. 로직·라우팅·모델 변경 없이 마크업·클래스만(예외: root 라우트 이동).
-- **반응형**: 모바일 360px 우선 검증(가로 스크롤 금지) ~ 데스크톱. 랜딩은 데스크톱·모바일 병행(max-w-6xl), 앱은 모바일 퍼스트.
-- **16.4 체크리스트** 준수: 우선 CTA 명확성, 금액·기한·상태 표시 형식 일관, 빈/로딩/오류 화면 설계.
+### 채택 방향: 웜 오렌지 에디토리얼 (기본안)
 
-### 제외
-
-- 관리자 콘솔(W4 미착수), 학부모 청구 링크(W3 F9), 분석 도구 실연동, 실제 디자인 에셋 제작, A/B 테스트 인프라.
-
-## 2. 대상 파일
-
-**신규**: `config/routes.rb`(수정), `app/controllers/landing_controller.rb`, `app/controllers/beta_applications_controller.rb`, `app/models/beta_application.rb`, `db/migrate/xxx_create_beta_applications.rb`, `app/views/landing/*`(섹션 파셜 구성), `app/views/beta_applications/*`(폼·완료), `tailwind.config.js`, `app/views/shared/*`(컴포넌트 파셜), `config/locales/ko.yml`(랜딩 카피 — 하드코딩 금지 규칙 준수).
-**수정**: `app/views/layouts/application.html.erb`(앱 셸 재구축), 기존 뷰 26파일, `app/controllers/dashboard_controller.rb`(라우트 이동 무관하나 확인), `db/schema.rb`.
-**테스트**: 기존 시스템/통합 테스트 중 `root_path` 의존 수정 + 랜딩 폼 신규 테스트.
-
-## 3. Rule ID
-
-- **TEN-002** (주민번호 수집 금지 — 베타 폼 필드 설계), **TEN-003** (식별정보 암호화·마스킹 — BetaApplication 연락처), **TEN-006 준용** (기록 최소화).
-- **16.2 상태 배지 체계**·**16.4 검수 체크리스트** — 리디자인 준거.
-- **13.4 카피 원칙** — 랜딩 문구 검증 기준.
-- 기존 INV/PAY/MSG/CR 로직 불변 (뷰 마크업만 변경).
-
-## 4. PRD/AGENTS.md 수정 필요 항목 (Phase 2)
-
-- PRD 13장에 "구현 확정 사항(2026-11-04)" 추가: 루트 결정(/=랜딩, /dashboard 이동), BetaApplication 스키마, 트래킹 최소 범위(data-event 마크업, 외부 스크립트 제외), 에셋 목업 대체 방침, Pretendard 채택. 버전 v2.2→v2.3.
-- AGENTS.md: 진행 상황 표에 병행 트랙(랜딩·퍼블리싱) 행 추가.
-
-## 5. 위임 계획
-
-| Phase | 위임 | 지시 요약 |
+| 참고 | 화면 | 채택 포인트 |
 |---|---|---|
-| 2 | 오케스트레이터 | PRD 13장 구현 확정 사항 + AGENTS.md 표 갱신 |
-| 3-A | wonbikok-developer | 디자인 시스템(토큰·파셜·앱셸) + 기존 26 뷰 리디자인. `_workspace/01_plan.md`, `01a_uibowl_references.md` 참조. 산출물 `03_implementation.md` |
-| 3-B | wonbikok-developer | 랜딩페이지 일체(라우트·컨트롤러·BetaApplication·뷰·SEO). 3-A 종료 후 순차 실행. 산출물 `03_implementation.md` 갱신 |
-| 4 | 오케스트레이터 | rubocop 0에러 + brakeman 0경고 + rails test |
-| 5 | wonbikok-reviewer | 뷰·폼 보안(스팸·개인정보), TEN-002/003, 16.4 체크리스트, 반응형·접근성 준수 검증. `05_review.md` |
-| 6 | wonbikok-developer | 리뷰 지적 최소 수정 |
-| 7 | wonbikok-tester | 기존 테스트 회귀(라우트 변경 대응 포함) + 랜딩 폼 테스트(유효성·동의·암호화) + 반응형 시스템 테스트. `07_test_report.md` |
-| 8 | 오케스트레이터 | bin/dev 부트 + 랜딩/대시보드/주요 화면 렌더 확인 |
-| 9 | 오케스트레이터 | 완료 보고 + AGENTS.md 갱신 + progress.json 리셋 |
+| 클래스101 (교육&도서, MAU 58만) | 검색·마이페이지·주문내역 | 화이트 바탕 + 웜 오렌지 주색(로고 컬러 계열), 블랙 강조 배너 + 오렌지 CTA, 텍스트 링크 오렌지. 교육 서비스 특유의 친근하고 따뜻한 톤 |
+| 뱅크샐러드 (금융) | 온보딩·검색·게이미피케이션 | (보조 참고) 강한 대비의 큰 타이포, 컬러 일러스트 카드의 표현력. 다크 테마 자체는 40~60대 타깃 가독성 리스크로 미채택 |
+| 폰코 (PC 랜딩) | 랜딩/다운로드 | (보조 참고) 히어로의 임팩트 있는 풀배경 컬러 사용 — 랜딩 히어로에 컬러 배경 적용 근거 |
+| MS Clarity (PC 랜딩) | 랜딩/소개 | (보조 참고) 제품 화면 목업을 히어로 우측에 크게 배치하는 B2B SaaS 구조 — 기존 10섹션 IA 유지 근거 |
 
-## 6. 리스크
+- 적용 원칙은 PRD 16.0을 준용하되 "정보 우선순위·레이아웃 구조" 차용을 유지하고,
+  색채 체계만 청색→웜 오렌지로 전면 교체. 기능·문구·데이터 바인딩은 불변.
+- 링크: https://uibowl.io/name/클래스%20101 ,
+  https://uibowl.io/name/뱅크샐러드 ,
+  https://uibowl.io/website/폰코?patterns=랜딩페이지 ,
+  https://uibowl.io/website/마이크로소프트%20클래리티%20(Microsoft%20Clarity)?patterns=랜딩페이지
 
-1. **root 라우트 변경** → 기존 테스트·링크 실패 가능 (Tester에서 일괄 수정).
-2. **전 뷰 리디자인** → 시스템 테스트 셀렉터 파손 가능 (마크업 유지보다 접근성 우선, 테스트 수정 허용).
-3. **Pretendard CDN** 오프라인 환경 → 시스템 폰트 폴백 스택 필수.
-4. **랜딩 폼 스팸** → 기본 rate limit만(과투자 금지, 파일럿 전).
-5. **디자인 에셋 부재** → 목업으로 출시 품질 미달 구간 존재(시연·스크린샷) — 실에셋 후속 교체 전제.
-6. 퍼블리싱 대규모 위임 1회(3-A) 분량 리스크 → Developer가 섹션별 우선순위(앱셸→폼→목록→상세) 순 진행.
+### 승인 시 변경 가능한 대안
+
+- B안: 프리미엄 다크+그린 (뱅크샐러드 온보딩풍 — 딥 네이비/블랙 + 브랜드 그린)
+- C안: 청색 유지 + 표현력 업그레이드 (색 교체 없이 카드 밀도·타이포·섀도 강화)
+
+## 3. 디자인 토큰 변경안 (tailwind.config.js)
+
+| 토큰 | 현행 | 변경 | 비고 |
+|---|---|---|---|
+| canvas | #F7F9FC (쿨 블루톤) | #FAF8F5 (웜 아이보리톤) | 앱·랜딩 공통 배경 |
+| surface | #FFFFFF | #FFFFFF 유지 | |
+| ink | #191F28 | #1D1A16 (웜톤 잉크) | 대비 유지 |
+| muted | #667085 | #6B655D (웜톤 뮤트) | |
+| line | #E4E7EC | #E8E2D9 (웜톤 경계선) | |
+| brand.500/600/700 | #3478F6/#2563EB/#1D4ED8 (청색) | #F97316/#EA580C/#C2410C (웜 오렌지) | 600은 흰 글자 AA 대비 확보 |
+| brand.50/100/200 | #EEF4FF/#DBE7FE/#BDD3FD | #FFF4ED/#FFE8D9/#FDDCB5 | 배지·연한 배경 |
+| info | 청색 공용 | 오렌지 계열 공용(brand와 동일 스케일) | |
+| success/warning/danger | 현행 유지 | 현행 유지 | 도메인 상태 의미 보존. 단 brand(오렌지)↔warning(앰버) 시각 혼동 리스크 → 배지는 "배경+테두리+아이콘" 조합으로 구분, Reviewer 검증 항목 |
+| fontFamily | Pretendard 유지 | 유지 | |
+
+공통 컴포넌트 클래스(app/assets/tailwind/application.css): `.btn-*`, `.field-input` 등은
+brand 토큰 참조이므로 자동 반영. 추가로 카드/섹션 표현력 클래스(rounded-2xl·소프트 섀도·
+섹션 대비)를 검토·보강.
+
+## 4. 대상 파일 (재구성 범위)
+
+- `tailwind.config.js` — 디자인 토큰 전면 교체
+- `app/assets/tailwind/application.css` — 공통 컴포넌트 클래스 보강
+- `app/views/layouts/` — application.html.erb, landing.html.erb (헤더·하단탭·푸터 톤)
+- `app/views/shared/` — badge/button/card/empty_state/flash/form_field/page_header/stepper (8 파셜)
+- `app/views/landing/` — show + 10 파셜 (hero/problems/solution/features/demo/social_proof/plan_card/pricing/regulation/faq/final_cta/beta_form)
+- `app/views/dashboard/show.html.erb`
+- `app/views/students/` — index/show/new/edit/_form/import_new/import_result (7)
+- `app/views/invoices/` — index/edit/cancel/results (4)
+- `app/views/reminders/` — index/settings/preview/history (4)
+- `app/views/onboarding/` — step2~step5 (4)
+- `app/views/registrations/new.html.erb`, `app/views/sessions/new.html.erb`
+- `app/views/beta_applications/` — new/_form/done (3)
+- 총 약 45개 뷰 파일 + 2 설정 파일
+
+**불변 원칙**: 라우트·컨트롤러·모델·Job·로직·i18n 문구 키 변경 금지. 뷰 마크업·클래스·
+CSS만 변경. 기존 데이터 바인딩·Turbo/Stimulus 훅(data-* 속성) 보존 필수.
+a11y(44px 터치 영역, 대비 AA, aria 속성)는 기존 수준 유지·개선.
+
+## 5. Rule ID / PRD 근거
+
+- 퍼블리싱 변경이므로 비즈니스 로직 Rule의 직접 구현은 없음. 다만 뷰 표시 관련:
+  - **TEN-003 계열**: 표시용 마스킹 유지 (뷰에서 마스킹 풀지 않기)
+  - **INV/PAY 상태 표시**: 상태 배지(success/warning/danger)의 도메인 의미 유지
+- PRD 13장(랜딩, 섹션 IA·문구 유지) / 16장(퍼블리싱 — 16.1 브랜드 컬러 재정의)
+- 접근성: PRD 16.1 (터치 44px 이상, 40~60대 가독성)
+
+## 6. Phase 2 문서 현행화 (Full 필수)
+
+- `PRD.md` 16.1: 브랜드 주색 #3478F6(청색) → 웜 오렌지(#EA580C) 재정의, 색채 규율 문구 갱신,
+  16.3 레퍼런스에 uibowl 2차 조사 결과 추가. 13장은 IA·문구 불변 확인(수정 없음이면 기록만).
+- `AGENTS.md`: Phase 9에서 진행 상황 표 갱신 (Phase 2에서는 사전 메모만).
+- `_workspace/02_prd_update.md`에 변경 섹션 기록.
+
+## 7. 위임 계획 (절약 모드)
+
+| Phase | 프로필 | 작업 |
+|---|---|---|
+| 3 | wonbikok-developer-lite 1개 | §3~4 전 범위 구현. 단일 위임(공유 파일 중심). 산출물 `03_implementation.md` |
+| 4 | (오케스트레이터 직접) | bin/rubocop + bin/brakeman + bin/rails test |
+| 5 | wonbikok-reviewer-lite 1개 | 변경 diff 리뷰. 산출물 `05_review.md` |
+| 6 | wonbikok-developer-lite 1개 | 리뷰 지적 수정 (지적 시에만) |
+| 7 | wonbikok-tester-lite 1개 | 전체 테스트 회귀 + 뷰 셀렉터 의존 테스트 수정. 산출물 `07_test_report.md` |
+| 8 | (오케스트레이터 직접) | 서버 기동 실행 검증 → `08_run_report.md` |
+
+각 스폰 직후 위임 실측(hard rule 9) → `00_delegation_log.md` 기록.
+
+## 8. 리스크
+
+1. **brand(오렌지)↔warning(앰버) 혼동** — 납부 예정(앰버) 배지와 CTA(오렌지)의 시각 구분.
+   → 배지 구성(배경+테두리) 차별화 + 리뷰 검증 항목 명시.
+2. **테스트 셀렉터 의존** — CSS 클래스 문자열을 assert하는 기존 테스트 존재 가능.
+   → Phase 7에서 전체 회귀 + 필요 시 테스트 수정.
+3. **40~60대 대비(AA)** — 오렌지 배경+흰 텍스트 대비. → 600톤 #EA580C(대비 3.6:1, 대형
+   텍스트/컴포넌트 AA) 확인, 본문 링크는 700톤 사용.
+4. **범위 과대** — 뷰 45파일 일괄 변경. → 단일 Developer 위임 + Phase 4 기계 검증으로 통제.
