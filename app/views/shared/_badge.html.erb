@@ -1,15 +1,16 @@
 <%# 상태 배지 — PRD 16.2 (색상+텍스트 병행, 색만으로 상태 전달 금지 / 15.4)
     사용: render "shared/badge", tone: :success, text: t("invoices.status.SENT")
-    tone: :neutral(기본) | :success | :warning | :danger | :info %>
+    tone: :neutral(기본) | :success | :warning | :danger | :info
+    2026-11-04 재구성: 배지는 "연한 배경 + 테두리" 조합 유지 — 브랜드 오렌지와 앰버(warning) 시각 구분 (PRD 16.1·16.2) %>
 <% tone = local_assigns.fetch(:tone, :neutral).to_sym %>
 <% text = local_assigns.fetch(:text, "") %>
 <%
   tone_classes = {
-    neutral: "bg-slate-100 text-slate-700",
-    success: "bg-success-50 text-success-700",
-    warning: "bg-warning-50 text-warning-700",
-    danger: "bg-danger-50 text-danger-700",
-    info: "bg-info-50 text-info-700"
+    neutral: "border border-slate-200 bg-slate-100 text-slate-700",
+    success: "border border-success-200 bg-success-50 text-success-700",
+    warning: "border border-warning-200 bg-warning-50 text-warning-700",
+    danger: "border border-danger-200 bg-danger-50 text-danger-700",
+    info: "border border-info-200 bg-info-50 text-info-700"
   }
 %>
 <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 align-middle text-xs font-semibold <%= tone_classes.fetch(tone, tone_classes[:neutral]) %>">

@@ -9,7 +9,7 @@
           cta_label: t("invoices.results.empty_cta"), cta_url: invoices_path(month: @month) %>
   <% end %>
   <% @logs.each do |log| %>
-    <div class="rounded-xl border border-line bg-surface p-4">
+    <div class="rounded-2xl border border-line bg-surface shadow-sm p-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <p class="min-w-0 text-sm font-bold text-ink">
           <span class="truncate"><%= log.invoice.student_name_snapshot %></span>

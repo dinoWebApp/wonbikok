@@ -62,7 +62,7 @@
           <%= render "landing/plan_card", plan: light_plan, cycle_price: light_plan[:monthly_price],
                 cycle_note: t("landing.pricing.cycle_note_monthly") %>
           <%= render "landing/plan_card", plan: standard_plan, cycle_price: standard_plan[:monthly_price],
-                cycle_note: t("landing.pricing.cycle_note_monthly") %>
+                cycle_note: t("landing.pricing.cycle_note_monthly"), featured: true %>
         </div>
       </div>
       <%# 연간 가격 카드 (연간 선택 시에만 표시) %>
@@ -71,7 +71,7 @@
           <%= render "landing/plan_card", plan: light_plan, cycle_price: light_plan[:annual_price],
                 cycle_note: t("landing.pricing.cycle_note_annual") %>
           <%= render "landing/plan_card", plan: standard_plan, cycle_price: standard_plan[:annual_price],
-                cycle_note: t("landing.pricing.cycle_note_annual") %>
+                cycle_note: t("landing.pricing.cycle_note_annual"), featured: true %>
         </div>
       </div>
     </div>

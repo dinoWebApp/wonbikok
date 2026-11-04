@@ -24,7 +24,7 @@
 
     <div class="space-y-3">
       <% @invoices.each do |invoice| %>
-        <div class="flex items-start gap-3 rounded-xl border border-line bg-surface p-4">
+        <div class="flex items-start gap-3 rounded-2xl border border-line bg-surface shadow-sm p-4">
           <%= check_box_tag "invoice_ids[]", invoice.id, false, id: "invoice_#{invoice.id}",
                 class: "mt-1 h-4.5 w-4.5 shrink-0 accent-brand-600" %>
           <label for="invoice_<%= invoice.id %>" class="min-w-0 flex-1 cursor-pointer text-sm">

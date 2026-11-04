@@ -7,7 +7,7 @@
   <%# 발송 전 최종 확인 — 미리보기 내용 + 확인 단계 (PRD 15.4) %>
   <%= form_with url: reminder_dispatch_path, method: :post, class: "space-y-3" do %>
     <% @previews.each do |preview| %>
-      <div class="rounded-xl border border-line bg-surface p-4 text-sm">
+      <div class="rounded-2xl border border-line bg-surface shadow-sm p-4 text-sm">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <p class="min-w-0 font-bold text-ink">
             <span class="truncate"><%= preview[:invoice].student_name_snapshot %></span>

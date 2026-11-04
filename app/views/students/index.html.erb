@@ -32,7 +32,7 @@
     <% @students.each do |student| %>
       <li>
         <%= link_to student_path(student),
-              class: "block rounded-xl border border-line bg-surface p-4 transition-colors hover:border-brand-200" do %>
+              class: "block rounded-2xl border border-line bg-surface shadow-sm p-4 transition-colors hover:border-brand-200" do %>
           <div class="flex items-start justify-between gap-2">
             <span class="min-w-0 truncate text-base font-bold text-ink"><%= student.name %></span>
             <div class="flex shrink-0 items-center gap-1">

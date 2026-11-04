@@ -1,7 +1,9 @@
 <%# 플랜 카드 — PRD 11.1 항목 표기. 미지원 항목은 명확히 "미지원" 표기 (13.4)
-    locals: plan(카드 해시), cycle_price(월간/연간 가격 문자열), cycle_note(결제 주기 안내) %>
-<div class="flex flex-col rounded-xl border border-line bg-surface p-5 md:p-6">
-  <p class="text-sm font-bold text-muted"><%= plan[:name] %></p>
+    locals: plan(카드 해시), cycle_price(월간/연간 가격 문자열), cycle_note(결제 주기 안내),
+            featured(대표 플랜 강조 — 브랜드 오렌지 테두리 + 플랜명 오렌지 강조) %>
+<% featured = local_assigns.fetch(:featured, false) %>
+<div class="flex flex-col <%= featured ? "rounded-2xl border-2 border-brand-600 bg-surface shadow-sm" : "rounded-2xl border border-line bg-surface shadow-sm" %> p-5 md:p-6">
+  <p class="text-sm font-bold <%= featured ? "text-brand-700" : "text-muted" %>"><%= plan[:name] %></p>
   <p class="mt-2 text-3xl font-extrabold tabular-nums tracking-tight text-ink"><%= cycle_price %></p>
   <p class="mt-1 text-xs text-muted"><%= cycle_note %></p>
   <dl class="mt-5 space-y-0 border-t border-line">

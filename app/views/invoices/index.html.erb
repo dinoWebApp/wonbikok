@@ -88,7 +88,7 @@
     <%= render "shared/empty_state", title: t("invoices.empty") %>
   <% end %>
   <% @invoices.each do |invoice| %>
-    <div class="rounded-xl border border-line bg-surface p-4">
+    <div class="rounded-2xl border border-line bg-surface shadow-sm p-4">
       <div class="flex items-start justify-between gap-2">
         <p class="min-w-0 text-base font-bold text-ink">
           <span class="truncate"><%= invoice.student_name_snapshot %></span> <%# TEN-004 스냅샷 %>
