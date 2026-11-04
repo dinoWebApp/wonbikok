@@ -123,6 +123,7 @@ bin/kamal deploy          # 프로덕션 배포 (git-deploy 스킬 절차 경유
 **진입점:** 아래에 해당하는 모든 요청은 오케스트레이터 명령어로 실행한다:
 - 일반 모드: `/wonbikok_orchestrator {요청}` — 메인 GLM-5.3 + 일반 프로필(wonbikok-developer/reviewer/tester)
 - 절약 모드: `/wonbikok_orchestrator_lite {요청}` — 메인 GLM-5.3-Flash + lite 프로필(-developer-lite/-reviewer-lite/-tester-lite)
+- 병렬 배치: `/wonbikok_orchestrator_parallel {태스크 목록}` / `/wonbikok_orchestrator_parallel_lite` — 서로 독립된 여러 작업 일괄 처리. 구현·테스트 작성만 fan-out, 문서·통합·게이트는 직렬(HARNESS_CONVENTION §6.14). 순차 의존 작업·단일 공유 파일 중심 작업은 일반/절약 모드 사용
 - 대상: 기능 구현, 코드 수정, 리팩터링, 버그 수정, 코드 리뷰, 테스트 작성, 디버깅, 마이그레이션, 모델/컨트롤러/뷰 설계, 비즈니스 로직 검증, 외부 연동(포트원·솔라피) 구현
 - 위 작업의 후속 요청 (수정, 보완, 개선, 리팩터링, 재실행, 업데이트)도 동일 명령어로 처리
 
@@ -132,7 +133,7 @@ bin/kamal deploy          # 프로덕션 배포 (git-deploy 스킬 절차 경유
 
 **배포:** "git 배포", "커밋", "푸시", "배포", "push", "kamal 배포" 요청 시 `$wonbikok-git-deploy` 스킬을 사용하라.
 
-**하네스 구성 요소:** 명령어는 `.zcode/commands/`(일반·절약 2개), 워크플로우·참조 스킬은 `.zcode/skills/`, 서브에이전트 프로필 6개(일반+lite)는 `.zcode/agents/`, 진행 상태는 `.zcode/progress.json`, 산출물은 `_workspace/`. 구성 규약은 HARNESS_CONVENTION.md (v4.0.3, ZCode Desktop 기준).
+**하네스 구성 요소:** 명령어는 `.zcode/commands/`(일반·절약·병렬 2종 합계 4개), 워크플로우·참조 스킬은 `.zcode/skills/`, 서브에이전트 프로필 6개(일반+lite)는 `.zcode/agents/`, 진행 상태는 `.zcode/progress.json`, 산출물은 `_workspace/`. 구성 규약은 HARNESS_CONVENTION.md (v4.1.1, ZCode Desktop 기준).
 
 **변경 이력:**
 
@@ -140,6 +141,7 @@ bin/kamal deploy          # 프로덕션 배포 (git-deploy 스킬 절차 경유
 |------|----------|------|------|
 | 2026-10-20 | 초기 하네스 구성 | 전체 | 신규 구축 (HARNESS_CONVENTION v3.2.0 기준) |
 | 2026-10-29 | omp→ZCode 하네스 전환 | 전체 | ZCode Desktop 런타임 이전 (HARNESS_CONVENTION v4.0.3 기준) |
+| 2026-11-04 | §6.14 병렬 배치 확장 채택 — 명령어 4종·오케스트레이터 스킬 병렬 절·병렬 후보 힌트 | 전체 | HARNESS_CONVENTION v4.1.1 동기화 |
 
 ## 구현 진행 상황 (로드맵)
 
@@ -152,5 +154,12 @@ PRD.md 18장 로드맵 기준. W1·W2 완료(2026-10-20/21).
 | W3 | 입금 확인(F4), 현금영수증(F5) + 학부모 청구 링크(F9) | ⬜ 미착수 |
 | W4 | 대시보드(F7), 구독·결제(F8), 관리자 핵심(A1·A2·A3·A5) | ⬜ 미착수 |
 | 병행 | 랜딩페이지(13장) 신규 제작 + 전체 퍼블리싱 리디자인(16장) — uibowl 레퍼런스 기반, 반응형 | ✅ 완료 (2026-11-04, 리뷰 CRITICAL 1·WARNING 4 수정 반영·테스트 174건 통과·실행검증 통과) |
+
+**병렬 배치 후보 조합** (HARNESS_CONVENTION §6.14.11 — 힌트용이며 실행 판정은 Phase 1-P의 3조건이 우선):
+
+- **W3 청크 내 분해 후보**: F4(입금 확인·Payment 도메인) ∥ F9(학부모 청구 링크·공개 페이지 도메인) — 파일 소유권 분리 가능. F5(현금영수증·포트원 연동)는 웰컴페이먼츠 실발행 스파이크 선행 결과에 의존하므로 F4·F9와 병렬 그룹을 다르게 판정할 것.
+- **W4 교차 그룹 후보**: F7(대시보드) ∥ F8(구독·결제) ∥ 관리자 A1·A2·A3(`Admin::` 네임스페이스로 소유권 분리 용이). 단 A5(현금영수증 발행 관리)는 W3 F5 완료에 의존.
+- **공통 제약**: 마이그레이션 체인·`config/routes.rb` 결선·`config/locales/ko.yml`·공통 파셜(`app/views/shared/`)은 공유 파일이므로 병렬 태스크에서 직접 수정 금지 — 통합(Phase 3-S)에서 단일 처리.
+- 완료 단계(W1·W2·랜딩·퍼블리싱): 후보 없음.
 
 작업 재개 가이드: `.zcode/progress.json`의 currentPhase 확인 → `awaiting_approval`이면 플랜(01_plan.md) 재요약 후 승인 대기 → 이외에는 해당 Phase부터 재개. 상세는 HARNESS_CONVENTION.md §8.2.

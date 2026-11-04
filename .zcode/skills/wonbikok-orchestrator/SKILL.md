@@ -33,6 +33,32 @@ description: 원비콕 개발 오케스트레이터. 신규 기능 구현, 코�
 |:---|:---|:---|:---|
 | `/wonbikok_orchestrator` (일반) | `wonbikok-developer` | `wonbikok-reviewer` | `wonbikok-tester` |
 | `/wonbikok_orchestrator_lite` (절약) | `wonbikok-developer-lite` | `wonbikok-reviewer-lite` | `wonbikok-tester-lite` |
+| `/wonbikok_orchestrator_parallel` (병렬·일반) | `wonbikok-developer` | `wonbikok-reviewer` | `wonbikok-tester` |
+| `/wonbikok_orchestrator_parallel_lite` (병렬·절약) | `wonbikok-developer-lite` | `wonbikok-reviewer-lite` | `wonbikok-tester-lite` |
+
+## 병렬 배치 파이프라인 (HARNESS_CONVENTION §6.14) — `_parallel` 명령어 진입 시 우선 적용
+
+서로 독립된 여러 작업을 한 번에 처리할 때 **구현(Phase 3-P)과 테스트 작성(Phase 7-P)만 병렬 fan-out**하고 나머지 단계는 직렬 배치로 합친다. ZCode 서브에이전트는 같은 워킹 트리에서 실행되므로 스테이지 병렬만 허용한다. 순차 의존 사슬·단일 공유 파일 중심 작업·Fast 규모 작업에는 병렬 배치를 사용하지 않고 일반/절약 명령어를 쓴다.
+
+**Phase 구조**: `0 → 1-P(분해·판정) → ✋승인(배치 1회) → 2(문서 현행화, 선택 태스크 전체 분량 직렬 1회) → 3-P(병렬 구현, Developer N개·상한 3) → 3-S(통합, Developer 1개) → 4 → 5 → 6? → 7-P(병렬 테스트 작성, 선택) → 7-S(배치 테스트 게이트) → 8 → 9`
+
+**병렬 안전 판정 3조건** (모두 충족해야 병렬 그룹, 미충족은 3-S 통합 작업으로):
+1. 파일 소유권 분리 — 태스크 간 생성/수정 파일이 겹치지 않음
+2. 의존 없음 — 같은 배치 내 다른 태스크 산출물을 참조하지 않음
+3. 공유 파일 비수정 — `config/routes.rb`(조립 결선), 공유 모델/스키마, 마이그레이션 체인, PRD/AGENTS, `.zcode/progress.json`을 직접 수정하지 않음
+
+**fan-out 위임 제약** (각 병렬 Developer/Tester 위임 프롬프트 필수 포함):
+- 소유권 화이트리스트: 자기 태스크 대상 파일만 생성/수정
+- 자체 검증 스코프 제한: `bin/rubocop`/브래크맨은 자기 파일 단위로만, `bin/rails test` 전체 실행 금지 — 형제 태스크 진행 중 코드로 인한 오탐 방지
+- repo-wide 명령 금지: 마이그레이션 생성(`bin/rails generate migration`)·전체 테스트·서버 기동은 3-S 통합 완료 후에만
+- 문서 수정 금지(PRD/AGENTS는 Phase 2에서 확정)
+- 스폰 직후 effort 실측 → `00_delegation_log.md` 기록 (병렬 스폰 전체 대상)
+
+**상태·산출물**: `progress.json`에 `pipelineType: "parallel"` + `parallelTasks`(id·files·status)를 오케스트레이터만 기입. 태스크별 산출물은 `_workspace/parallel/<task-id>/`(03·07), 배치 수준 산출물(01·02·05·08)은 기존 `_workspace/`.
+
+**통합(3-S)·게이트(7-S)**: 마이그레이션은 통합에서 단 1회 생성(동시 생성 시 타임스탬프 충돌). 태스크 완료 수신 시마다 `git diff`를 소유권 표와 대조해 위반 태스크만 재위임. 7-S는 전체 `bin/rails test` + `bin/rubocop` + `bin/brakeman` 1회 실행이며 실패는 원인 태스크로 라우팅(테스트 오류→해당 Tester, 코드 버그→해당 Developer). 태스크 실패는 해당 태스크만 1회 재시도 후 드롭·보고 명시.
+
+**승인 게이트(배치 단위 1회)**: 1-P 플랜에 태스크별 파일 소유권 표·병렬/통합 분류·동시성 상한을 포함해 보고 → 사용자가 병렬 실행 태스크 확정 → 턴 종료 후 대기. 승인 전 어떤 에이전트도 스폰하지 않는다(하드 룰 1과 동일).
 
 ## 서브에이전트 호출 (Agent 도구)
 
