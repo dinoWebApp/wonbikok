@@ -1,0 +1,22 @@
+<%# 폼 필드 — 라벨 + 입력(yield) + 에러 + 도움말 (PRD 16.4 폼 일관·15.4 접근성)
+    사용법: render layout: "shared/form_field", locals: { form: f, attr: :name,
+            label_text: t("..."), hint: t("..."), required: true } do
+            ...입력 요소(class: "field-input")... end
+    에러는 form.object.errors[attr]에서 자동 표시(model 폼). url 기반 폼은 에러 없음.
+    locals: form(필수 builder), attr(필수), label_text(필수), hint, required, error(수동 에러 문자열), class %>
+<div class="<%= local_assigns.fetch(:class, "") %>">
+  <div class="mb-1.5 flex items-baseline justify-between gap-2">
+    <%= form.label attr, label_text, class: "text-sm font-semibold text-ink" %>
+    <% if local_assigns[:required] %>
+      <span class="text-xs font-semibold text-danger-600">(<%= t("common.required") %>)</span>
+    <% end %>
+  </div>
+  <%= yield %>
+  <% field_errors = local_assigns[:error].presence || (form.object.respond_to?(:errors) ? form.object.errors[attr] : []) %>
+  <% Array(field_errors).each do |message| %>
+    <p class="mt-1 text-sm font-medium text-danger-700"><%= message %></p>
+  <% end %>
+  <% if local_assigns[:hint].present? %>
+    <p class="mt-1.5 text-xs leading-relaxed text-muted"><%= hint %></p>
+  <% end %>
+</div>

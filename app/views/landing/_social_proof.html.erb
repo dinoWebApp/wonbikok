@@ -1,0 +1,23 @@
+<%# 7. 사회적 증거 — 파일럿 후기는 모집 전까지 파일럿 모집 배너로 대체 (PRD 13.2·13.8)
+    허수 후기·가짜 로고 금지(13.4) — 실제 참여 원장 후기 확보 후 이 섹션을 교체 %>
+<section class="border-b border-line bg-surface">
+  <div class="mx-auto max-w-3xl px-4 py-12 md:py-20">
+    <%= render layout: "shared/card", locals: { class: "p-6 md:p-8" } do %>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-sm font-bold text-brand-700">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 21.5s-7.5-5.6-7.5-11a7.5 7.5 0 1 1 15 0c0 5.4-7.5 11-7.5 11z" fill="#3478F6" opacity="0.16"/>
+            <path d="M12 21.5s-7.5-5.6-7.5-11a7.5 7.5 0 1 1 15 0c0 5.4-7.5 11-7.5 11z" fill="#3478F6"/>
+            <circle cx="12" cy="10.5" r="2.6" fill="#FFFFFF"/>
+          </svg>
+          <%= t("landing.proof.badge") %>
+        </span>
+      </div>
+      <h2 class="mt-4 text-xl font-extrabold tracking-tight text-ink md:text-2xl"><%= t("landing.proof.title") %></h2>
+      <p class="mt-3 text-base leading-relaxed text-muted"><%= t("landing.proof.copy") %></p>
+      <div class="mt-6">
+        <%= link_to t("landing.proof.cta"), "#beta", class: "btn-secondary" %>
+      </div>
+    <% end %>
+  </div>
+</section>

@@ -1,0 +1,33 @@
+<%# 공통 버튼 — 라벨은 동작 설명형("확인"보다 "입금 완료로 표시"), 최소 터치 영역 44px (PRD 16.1·15.4)
+    사용:
+      render "shared/button", label: t("..."), url: path                            # 링크 버튼
+      render "shared/button", label: t("..."), url: path, method: :patch            # button_to(PATCH 등)
+      render "shared/button", label: t("..."), form: form                           # form.submit
+      render "shared/button", label: t("...")                                       # <button type=button>
+    locals:
+      label(필수), variant: :primary | :secondary | :destructive | :destructive_secondary | :warning_secondary
+      size: :md(44px·기본) | :lg(48px), url/method/form/type/data/form_options/class/disabled %>
+<% variant = local_assigns.fetch(:variant, :primary).to_sym %>
+<% size = local_assigns.fetch(:size, :md).to_sym %>
+<% data = local_assigns.fetch(:data, {}) %>
+<%
+  variant_class = {
+    primary: "btn-primary",
+    secondary: "btn-secondary",
+    destructive: "btn-destructive",
+    destructive_secondary: "btn-destructive-secondary",
+    warning_secondary: "btn-warning-secondary"
+  }.fetch(variant, "btn-primary")
+  btn_class = [ variant_class, (size == :lg ? "btn-lg" : nil), local_assigns[:class] ].compact.join(" ")
+%>
+<% if local_assigns[:form] %>
+  <%= form.submit label, data: data, class: btn_class %>
+<% elsif local_assigns[:url].present? && local_assigns[:method].present? %>
+  <%= button_to label, url, method: local_assigns[:method],
+        form: local_assigns.fetch(:form_options, {}), data: data, class: btn_class %>
+<% elsif local_assigns[:url].present? %>
+  <%= link_to label, url, data: data, class: btn_class %>
+<% else %>
+  <%= button_tag label, type: local_assigns.fetch(:type, "button"),
+        disabled: local_assigns.fetch(:disabled, false), data: data, class: btn_class %>
+<% end %>

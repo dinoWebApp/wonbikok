@@ -79,7 +79,7 @@ class OnboardingController < ApplicationController
       PracticeDataSeeder.new(tenant: @tenant).call
     end
     @tenant.update!(onboarding_step: Tenant::ONBOARDING_FINAL_STEP)
-    redirect_to root_path, status: :see_other, notice: t("onboarding.completed")
+    redirect_to dashboard_path, status: :see_other, notice: t("onboarding.completed")
   end
 
   def advance_step(from)
@@ -89,7 +89,7 @@ class OnboardingController < ApplicationController
   end
 
   def skip_if_onboarding_complete
-    redirect_to root_path if current_tenant.onboarding_complete?
+    redirect_to dashboard_path if current_tenant.onboarding_complete? # 앱 홈 = /dashboard (2026-11-04 라우트 이동)
   end
 
   def business_params

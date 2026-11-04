@@ -1,79 +1,74 @@
-<div class="space-y-4">
-  <div class="flex items-center justify-between">
-    <h1 class="text-xl font-bold"><%= t("reminders.title") %></h1>
-    <div class="flex gap-2">
-      <%= link_to t("reminders.settings_link"), reminder_settings_path,
-            class: "min-h-11 px-3 inline-flex items-center rounded-lg border border-slate-300 bg-white text-sm" %>
-      <%= link_to t("reminders.history_link"), reminder_history_path,
-            class: "min-h-11 px-3 inline-flex items-center rounded-lg border border-slate-300 bg-white text-sm" %>
+<%= render layout: "shared/page_header", locals: { title: t("reminders.title"),
+      description: t("reminders.index.subtitle") } do %>
+  <%= render "shared/button", label: t("reminders.settings_link"), url: reminder_settings_path, variant: :secondary, class: "px-3" %>
+  <%= render "shared/button", label: t("reminders.history_link"), url: reminder_history_path, variant: :secondary, class: "px-3" %>
+<% end %>
+
+<% if @invoices.empty? %>
+  <%# 빈 상태 — 다음 액션 안내 필수 (PRD 15.4) %>
+  <%= render "shared/empty_state", title: t("reminders.index.empty"),
+        cta_label: t("reminders.index.empty_cta"), cta_url: invoices_path %>
+<% else %>
+  <%# 즉시 발송: 선택 → 미리보기 → 발송 (MSG-001 유일성은 Dispatcher가 보장) %>
+  <%= form_with url: reminder_preview_path, method: :get, class: "space-y-3" do %>
+    <div class="flex items-center justify-between gap-2">
+      <label class="flex min-h-11 flex-1 cursor-pointer items-center gap-2.5 text-sm text-ink">
+        <%= check_box_tag :select_all, "1", false,
+              class: "h-4.5 w-4.5 accent-brand-600",
+              data: { controller: "reminders-select-all",
+                      action: "reminders-select-all#toggle" } %>
+        <%= t("reminders.index.select_all") %>
+      </label>
+      <%= submit_tag t("reminders.index.preview"), class: "btn-primary shrink-0" %>
     </div>
-  </div>
 
-  <p class="text-sm text-slate-500"><%= t("reminders.index.subtitle") %></p>
-
-  <% if @invoices.empty? %>
-    <div class="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">
-      <%= t("reminders.index.empty") %>
-    </div>
-  <% else %>
-    <%# 즉시 발송: 선택 → 미리보기 → 발송 (MSG-001 유일성은 Dispatcher가 보장) %>
-    <%= form_with url: reminder_preview_path, method: :get, class: "space-y-3" do %>
-      <div class="flex items-center justify-between">
-        <label class="flex items-center gap-2 text-sm">
-          <%= check_box_tag :select_all, "1", false,
-                data: { controller: "reminders-select-all",
-                        action: "reminders-select-all#toggle" } %>
-          <%= t("reminders.index.select_all") %>
-        </label>
-        <%= submit_tag t("reminders.index.preview"),
-              class: "min-h-11 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold" %>
-      </div>
-
-      <div class="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-        <% @invoices.each do |invoice| %>
-          <div class="flex items-start gap-3 p-4">
-            <%= check_box_tag "invoice_ids[]", invoice.id, false, id: "invoice_#{invoice.id}" %>
-            <div class="flex-1 text-sm">
-              <p class="font-semibold">
-                <%= invoice.student_name_snapshot %>
-                <% if invoice.student.excluded_from_reminders? %>
-                  <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500"><%= t("reminders.index.excluded_badge") %></span>
-                <% end %>
-              </p>
-              <p class="text-slate-500">
-                <%= number_with_delimiter(invoice.total_amount) %><%= t("invoices.won") %>
-                · <%= t("reminders.index.due_on") %> <%= invoice.due_on.strftime("%-m/%-d") %>
-                · <%= t("reminders.index.days_overdue") %>
-                  <%= t("reminders.index.days", days: invoice.days_overdue) %>
-                <% stage = Reminders::Scheduler.due_stage_for(invoice) %>
-                <% if stage %>
-                  · <%= t("reminders.index.stage.#{stage}") %>
-                <% end %>
-              </p>
-              <p class="text-xs text-slate-400">
-                <%= t("reminders.index.last_reminder") %>:
-                <% if (last = @last_reminder_at[invoice.id]) %>
-                  <%= l(last, format: :short) %>
-                <% else %>
-                  <%= t("reminders.index.none") %>
-                <% end %>
-              </p>
-            </div>
-            <%# 제외 토글 — 해제 시 자동 발송 즉시 배제(MSG-004) %>
-            <%= button_to invoice.student.excluded_from_reminders? ? t("reminders.index.toggle_include") : t("reminders.index.toggle_exclude"),
-                  reminder_student_exclusion_path(invoice.student_id), method: :patch,
-                  class: "min-h-9 px-2 rounded-lg border border-slate-300 bg-white text-xs" %>
-          </div>
-        <% end %>
-      </div>
-    <% end %>
-
-    <p class="text-sm">
-      <% if @excluded_only %>
-        <%= link_to t("reminders.index.back_to_all"), reminders_path, class: "text-blue-600" %>
-      <% else %>
-        <%= link_to t("reminders.index.excluded_filter"), reminders_path(excluded: 1), class: "text-blue-600" %>
+    <div class="space-y-3">
+      <% @invoices.each do |invoice| %>
+        <div class="flex items-start gap-3 rounded-xl border border-line bg-surface p-4">
+          <%= check_box_tag "invoice_ids[]", invoice.id, false, id: "invoice_#{invoice.id}",
+                class: "mt-1 h-4.5 w-4.5 shrink-0 accent-brand-600" %>
+          <label for="invoice_<%= invoice.id %>" class="min-w-0 flex-1 cursor-pointer text-sm">
+            <span class="flex flex-wrap items-center gap-1.5">
+              <span class="font-bold text-ink"><%= invoice.student_name_snapshot %></span>
+              <% if invoice.student.excluded_from_reminders? %>
+                <%= render "shared/badge", tone: :neutral, text: t("reminders.index.excluded_badge") %>
+              <% end %>
+            </span>
+            <span class="mt-1 block leading-relaxed text-muted">
+              <%# 금액: 오른쪽 정렬 계열 + tabular-nums (PRD 16.1) %>
+              <span class="font-semibold tabular-nums text-ink"><%= number_with_delimiter(invoice.total_amount) %><%= t("invoices.won") %></span>
+              · <%= t("reminders.index.due_on") %> <span class="tabular-nums"><%= invoice.due_on.strftime("%-m/%-d") %></span>
+              · <%= t("reminders.index.days_overdue") %>
+              <span class="tabular-nums"><%= t("reminders.index.days", days: invoice.days_overdue) %></span>
+              <% stage = Reminders::Scheduler.due_stage_for(invoice) %>
+              <% if stage %>
+                · <span class="font-medium text-warning-700"><%= t("reminders.index.stage.#{stage}") %></span>
+              <% end %>
+            </span>
+            <span class="mt-1 block text-xs text-muted opacity-80">
+              <%= t("reminders.index.last_reminder") %>:
+              <% if (last = @last_reminder_at[invoice.id]) %>
+                <span class="tabular-nums"><%= l(last, format: :short) %></span>
+              <% else %>
+                <%= t("reminders.index.none") %>
+              <% end %>
+            </span>
+          </label>
+          <%# 제외 토글 — 해제 시 자동 발송 즉시 배제(MSG-004) %>
+          <%= button_to invoice.student.excluded_from_reminders? ? t("reminders.index.toggle_include") : t("reminders.index.toggle_exclude"),
+                reminder_student_exclusion_path(invoice.student_id), method: :patch,
+                form: { class: "shrink-0" },
+                class: "btn-secondary shrink-0 self-center px-3 text-xs" %>
+        </div>
       <% end %>
-    </p>
+    </div>
   <% end %>
-</div>
+
+  <p class="mt-4 text-sm">
+    <% if @excluded_only %>
+      <%= link_to t("reminders.index.back_to_all"), reminders_path, class: "inline-flex min-h-11 items-center font-semibold text-brand-700 underline underline-offset-2" %>
+    <% else %>
+      <%= link_to t("reminders.index.excluded_filter"), reminders_path(excluded: 1), class: "inline-flex min-h-11 items-center font-semibold text-brand-700 underline underline-offset-2" %>
+    <% end %>
+  </p>
+<% end %>

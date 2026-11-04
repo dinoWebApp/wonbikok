@@ -1,0 +1,8 @@
+<%# 베타 신청 독립 페이지 — 랜딩 외 직접 유입(공유 링크 등) 경유 %>
+<div class="mx-auto max-w-2xl px-4 py-12 md:py-16">
+  <h1 class="text-2xl font-extrabold tracking-tight text-ink md:text-3xl"><%= t("beta_applications.new.title") %></h1>
+  <p class="mt-3 text-base leading-relaxed text-muted"><%= t("beta_applications.new.description") %></p>
+  <div class="mt-8">
+    <%= render "form", beta_application: @beta_application %>
+  </div>
+</div>

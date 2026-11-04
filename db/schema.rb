@@ -10,7 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_20_000010) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_04_000001) do
+  create_table "beta_applications", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "title", null: false
+    t.string "contact_type", null: false
+    t.string "contact_value", null: false
+    t.string "academy_type", null: false
+    t.string "student_count_range"
+    t.text "current_method"
+    t.text "pain_point"
+    t.boolean "terms_agreed", default: false, null: false
+    t.boolean "marketing_agreed", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contact_type", "contact_value"], name: "index_beta_applications_on_contact_type_and_contact_value", unique: true
+  end
+
   create_table "guardians", force: :cascade do |t|
     t.integer "student_id", null: false
     t.string "name", null: false

@@ -1,31 +1,34 @@
-<h1 class="text-xl font-bold mb-2"><%= t("students.import.title") %></h1>
-<p class="text-sm text-slate-600 mb-4"><%= t("students.import.description") %></p>
+<%= render "shared/page_header", title: t("students.import.title"),
+      description: t("students.import.description") %>
 
-<div class="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
-  <div class="flex flex-col gap-2">
-    <%= link_to t("students.import.download_template"), import_template_students_path,
-          class: "min-h-11 px-4 flex items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-semibold" %>
-    <p class="text-xs text-slate-500"><%= t("students.import.template_notice") %></p>
-  </div>
+<%= render layout: "shared/card", locals: { class: "p-5 space-y-4" } do %>
+  <%# 1단계: 양식 다운로드 %>
+  <%= render "shared/button", label: t("students.import.download_template"),
+        url: import_template_students_path, variant: :secondary, class: "w-full" %>
+  <p class="-mt-2 text-xs leading-relaxed text-muted"><%= t("students.import.template_notice") %></p>
 
+  <%# 2단계: 파일 업로드 %>
   <%= form_with url: import_students_path, method: :post, local: true, class: "space-y-3" do |form| %>
-    <div>
-      <%= form.label :file, t("students.import.file_label"), class: "block text-sm font-semibold mb-1" %>
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :file,
+          label_text: t("students.import.file_label"), required: true,
+          hint: t("students.import.utf8_notice") } do %>
       <%= form.file_field :file, accept: ".csv,text/csv", required: true,
-            class: "w-full text-sm" %>
-    </div>
-    <p class="text-xs text-slate-500"><%= t("students.import.utf8_notice") %></p>
-    <%= form.submit t("students.import.submit"),
-          class: "min-h-11 w-full rounded-lg bg-slate-900 text-white font-semibold text-sm" %>
+            class: "w-full text-sm text-ink file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100" %>
+    <% end %>
+    <%= form.submit t("students.import.submit"), class: "btn-primary btn-lg w-full" %>
   <% end %>
-</div>
+<% end %>
 
-<div class="mt-4 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 space-y-1">
-  <p class="font-semibold text-slate-900"><%= t("students.import.rules_title") %></p>
-  <p><%= t("students.import.rules_required") %></p>
-  <p><%= t("students.import.rules_fee") %></p>
-  <p><%= t("students.import.rules_payment_day") %></p>
-  <p><%= t("students.import.rules_types") %></p>
-</div>
+<%= render layout: "shared/card", locals: { class: "mt-4 p-5" } do %>
+  <p class="text-sm font-bold text-ink"><%= t("students.import.rules_title") %></p>
+  <ul class="mt-2 space-y-1.5 text-sm leading-relaxed text-muted">
+    <li><%= t("students.import.rules_required") %></li>
+    <li><%= t("students.import.rules_fee") %></li>
+    <li><%= t("students.import.rules_payment_day") %></li>
+    <li><%= t("students.import.rules_types") %></li>
+  </ul>
+<% end %>
 
-<%= link_to t("common.back"), students_path, class: "mt-4 inline-block text-sm text-slate-600" %>
+<div class="mt-4">
+  <%= render "shared/button", label: t("common.back"), url: students_path, variant: :secondary, class: "w-full" %>
+</div>

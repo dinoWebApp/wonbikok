@@ -1,3 +1,5 @@
-<h1 class="text-xl font-bold mb-4"><%= t("students.form.title_edit", name: @student.name) %></h1>
+<%= render layout: "shared/page_header", locals: { title: t("students.form.title_edit", name: @student.name) } do %>
+  <%= render "shared/button", label: t("common.cancel"), url: student_path(@student), variant: :secondary %>
+<% end %>
 
 <%= render "form", student: @student, confirm: false %>

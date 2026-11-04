@@ -1,19 +1,35 @@
-<div class="space-y-4">
-  <h1 class="text-xl font-bold"><%= t("invoices.cancel.title") %></h1>
-  <div class="rounded-xl border border-slate-200 bg-white p-5">
-    <p class="text-sm text-slate-500">
-      <%= @invoice.student_name_snapshot %> · <%= @invoice.target_month %> ·
-      <%= number_with_delimiter(@invoice.total_amount) %><%= t("invoices.won") %>
-      (<%= t("invoices.status.#{@invoice.status}") %>)
-    </p>
-    <%= form_with url: cancel_invoice_path(@invoice), class: "mt-4 space-y-3" do %>
-      <%= label_tag :cancel_reason, t("invoices.cancel.reason"), class: "text-sm font-semibold" %>
-      <%= text_field_tag :cancel_reason, nil, required: true,
-            class: "w-full rounded-lg border border-slate-300 px-3 py-2" %>
-      <p class="text-xs text-slate-500"><%= t("invoices.cancel.notice") %></p>
-      <%= submit_tag t("invoices.cancel.submit"),
-            data: { turbo_confirm: t("invoices.cancel.confirm") },
-            class: "min-h-11 w-full rounded-lg bg-red-600 text-white text-sm font-semibold" %>
-    <% end %>
+<%= render "shared/page_header", title: t("invoices.cancel.title") %>
+
+<%= render layout: "shared/card", locals: { class: "p-5" } do %>
+  <div class="flex items-baseline justify-between gap-4 border-b border-line pb-4 text-sm">
+    <p class="min-w-0 font-semibold text-ink"><%= @invoice.student_name_snapshot %></p>
+    <% invoice_tone = { "DRAFT" => :neutral, "READY" => :info, "SENT" => :success,
+                        "UNPAID" => :warning, "OVERDUE" => :warning, "CANCELLED" => :neutral }.fetch(@invoice.status, :neutral) %>
+    <%= render "shared/badge", tone: invoice_tone, text: t("invoices.status.#{@invoice.status}") %>
   </div>
+  <div class="flex items-baseline justify-between gap-4 py-4 text-sm">
+    <p class="text-muted"><%= @invoice.target_month %></p>
+    <%# 금액: 오른쪽 정렬 + tabular-nums (PRD 16.1) %>
+    <p class="text-base font-bold tabular-nums text-ink"><%= number_with_delimiter(@invoice.total_amount) %><%= t("invoices.won") %></p>
+  </div>
+
+  <%= form_with url: cancel_invoice_path(@invoice), class: "mt-1 space-y-3" do %>
+    <div>
+      <div class="mb-1.5 flex items-baseline justify-between gap-2">
+        <%= label_tag :cancel_reason, t("invoices.cancel.reason"), class: "text-sm font-semibold text-ink" %>
+        <span class="text-xs font-semibold text-danger-600">(<%= t("common.required") %>)</span>
+      </div>
+      <%= text_field_tag :cancel_reason, nil, required: true, class: "field-input" %>
+      <p class="mt-1.5 text-xs leading-relaxed text-muted"><%= t("invoices.cancel.notice") %></p>
+    </div>
+    <%# 취소(INV-003) — 되돌릴 수 없는 작업: 확인 단계 필수 (PRD 15.4) %>
+    <%= submit_tag t("invoices.cancel.submit"),
+          data: { turbo_confirm: t("invoices.cancel.confirm") },
+          class: "btn-destructive btn-lg w-full" %>
+  <% end %>
+<% end %>
+
+<div class="mt-4">
+  <%= render "shared/button", label: t("common.back"),
+        url: invoices_path(month: @invoice.target_month), variant: :secondary, class: "w-full" %>
 </div>

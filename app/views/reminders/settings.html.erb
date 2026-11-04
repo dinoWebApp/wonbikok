@@ -1,79 +1,70 @@
-<div class="space-y-4">
-  <div class="flex items-center justify-between">
-    <h1 class="text-xl font-bold"><%= t("reminders.settings.title") %></h1>
-    <%= link_to t("common.back"), reminders_path,
-          class: "min-h-11 px-3 inline-flex items-center rounded-lg border border-slate-300 bg-white text-sm" %>
-  </div>
+<%= render layout: "shared/page_header", locals: { title: t("reminders.settings.title") } do %>
+  <%= render "shared/button", label: t("common.back"), url: reminders_path, variant: :secondary %>
+<% end %>
 
-  <%= form_with model: @tenant, url: reminder_settings_path, method: :patch, class: "space-y-4" do |f| %>
-    <div class="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
-      <%# 문구 톤 3종(부드러움/표준/공식) %>
-      <div>
-        <%= f.label :remind_tone, t("reminders.settings.tone"), class: "text-sm font-semibold" %>
-        <div class="mt-2 flex gap-3 text-sm">
-          <% Tenant::REMINDER_TONES.each do |tone| %>
-            <label class="flex items-center gap-1">
-              <%= f.radio_button :remind_tone, tone %>
-              <%= t("reminders.settings.tone_options.#{tone}") %>
-            </label>
-          <% end %>
-        </div>
-        <p class="mt-1 text-xs text-slate-500"><%= t("reminders.settings.tone_hint") %></p>
+<%= form_with model: @tenant, url: reminder_settings_path, method: :patch, class: "space-y-4" do |f| %>
+  <%= render layout: "shared/card", locals: { class: "p-5 space-y-5" } do %>
+    <%# 문구 톤 3종(부드러움/표준/공식) — 큰 터치 영역 (PRD 15.4) %>
+    <fieldset>
+      <legend class="text-sm font-semibold text-ink"><%= t("reminders.settings.tone") %></legend>
+      <div class="mt-2 flex flex-wrap gap-2 text-sm">
+        <% Tenant::REMINDER_TONES.each do |tone| %>
+          <label class="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface px-3.5 text-ink transition-colors has-checked:border-brand-600 has-checked:bg-brand-50 has-checked:text-brand-700">
+            <%= f.radio_button :remind_tone, tone, class: "h-4 w-4 accent-brand-600" %>
+            <%= t("reminders.settings.tone_options.#{tone}") %>
+          </label>
+        <% end %>
       </div>
+      <p class="mt-1.5 text-xs leading-relaxed text-muted"><%= t("reminders.settings.tone_hint") %></p>
+    </fieldset>
 
-      <%# 단계별 ON/OFF %>
-      <fieldset>
-        <legend class="text-sm font-semibold"><%= t("reminders.settings.stages") %></legend>
-        <div class="mt-2 space-y-2 text-sm">
-          <label class="flex items-center gap-2">
-            <%= f.check_box :remind_d3_enabled %>
-            <%= t("reminders.settings.stage_d3") %>
-          </label>
-          <label class="flex items-center gap-2">
-            <%= f.check_box :remind_d7_enabled %>
-            <%= t("reminders.settings.stage_d7") %>
-          </label>
-          <label class="flex items-center gap-2">
-            <%= f.check_box :remind_month_end_enabled %>
-            <%= t("reminders.settings.stage_month_end") %>
-          </label>
-        </div>
-      </fieldset>
-
-      <%# 발송 시각 (MSG-006: 9~17시) %>
-      <div>
-        <%= f.label :remind_send_hour, t("reminders.settings.send_hour"), class: "text-sm font-semibold" %>
-        <div class="mt-1 flex items-center gap-2 text-sm">
-          <%= f.number_field :remind_send_hour, in: 9..17, class: "w-20 rounded-lg border border-slate-300 px-3 py-2" %>
-          <%= t("reminders.settings.send_hour_hint") %>
-        </div>
+    <%# 단계별 ON/OFF %>
+    <fieldset>
+      <legend class="text-sm font-semibold text-ink"><%= t("reminders.settings.stages") %></legend>
+      <div class="mt-2 space-y-1 text-sm">
+        <label class="flex min-h-11 cursor-pointer items-center gap-2.5 text-ink">
+          <%= f.check_box :remind_d3_enabled, class: "h-4.5 w-4.5 accent-brand-600" %>
+          <%= t("reminders.settings.stage_d3") %>
+        </label>
+        <label class="flex min-h-11 cursor-pointer items-center gap-2.5 text-ink">
+          <%= f.check_box :remind_d7_enabled, class: "h-4.5 w-4.5 accent-brand-600" %>
+          <%= t("reminders.settings.stage_d7") %>
+        </label>
+        <label class="flex min-h-11 cursor-pointer items-center gap-2.5 text-ink">
+          <%= f.check_box :remind_month_end_enabled, class: "h-4.5 w-4.5 accent-brand-600" %>
+          <%= t("reminders.settings.stage_month_end") %>
+        </label>
       </div>
-    </div>
+    </fieldset>
 
-    <%# 단계별 커스텀 문구(기본 문구보다 우선) %>
-    <div class="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
-      <% { remind_custom_text_d3: :d3, remind_custom_text_d7: :d7, remind_custom_text_month_end: :month_end }.each do |attr, stage| %>
-        <div>
-          <%= f.label attr, t("reminders.settings.custom_text") + " · " + t("reminders.settings.stage_#{stage}"),
-                class: "text-sm font-semibold" %>
-          <%= f.text_area attr, rows: 3,
-                placeholder: t("reminders.settings.custom_hint"),
-                class: "mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" %>
-        </div>
-      <% end %>
-      <%= f.submit t("common.save"),
-            class: "min-h-11 px-4 rounded-lg bg-slate-900 text-white text-sm font-semibold" %>
-    </div>
+    <%# 발송 시각 (MSG-006: 9~17시) %>
+    <%= render layout: "shared/form_field", locals: { form: f, attr: :remind_send_hour,
+          label_text: t("reminders.settings.send_hour"), hint: t("reminders.settings.send_hour_hint") } do %>
+      <%= f.number_field :remind_send_hour, in: 9..17, class: "field-input w-24 text-right tabular-nums" %>
+    <% end %>
   <% end %>
 
-  <%# 단계별 기본 문구 미리보기(예시 데이터 — 개인정보 없음) %>
-  <div class="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
-    <p class="text-sm font-semibold"><%= t("reminders.settings.preview_title") %></p>
-    <% @previews.each do |stage, text| %>
-      <div>
-        <p class="text-xs text-slate-500"><%= t("reminders.index.stage.#{stage}") %></p>
-        <pre class="mt-1 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs text-slate-700"><%= text %></pre>
-      </div>
+  <%# 단계별 커스텀 문구(기본 문구보다 우선) %>
+  <%= render layout: "shared/card", locals: { class: "p-5 space-y-4" } do %>
+    <% { remind_custom_text_d3: :d3, remind_custom_text_d7: :d7, remind_custom_text_month_end: :month_end }.each do |attr, stage| %>
+      <%= render layout: "shared/form_field", locals: { form: f, attr: attr,
+            label_text: t("reminders.settings.custom_text") + " · " + t("reminders.settings.stage_#{stage}"),
+            hint: t("reminders.settings.custom_hint") } do %>
+        <%= f.text_area attr, rows: 3, placeholder: t("reminders.settings.custom_hint"),
+              class: "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:opacity-60 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" %>
+      <% end %>
     <% end %>
-  </div>
-</div>
+    <%= f.submit t("common.save"), class: "btn-primary btn-lg w-full" %>
+  <% end %>
+<% end %>
+
+<%# 단계별 기본 문구 미리보기(예시 데이터 — 개인정보 없음) %>
+<%= render layout: "shared/card", locals: { class: "mt-4 p-5 space-y-3" } do %>
+  <p class="text-sm font-bold text-ink"><%= t("reminders.settings.preview_title") %></p>
+  <% @previews.each do |stage, text| %>
+    <div>
+      <p class="text-xs font-medium text-muted"><%= t("reminders.index.stage.#{stage}") %></p>
+      <pre class="mt-1 whitespace-pre-wrap rounded-lg bg-canvas p-3 text-xs leading-relaxed text-ink"><%= text %></pre>
+    </div>
+  <% end %>
+<% end %>

@@ -1,0 +1,6 @@
+<%# 카드 표면 — 흰 배경·보더·중간 라운드(rounded-xl)·그림자 없음 (PRD 16.1)
+    사용: render layout: "shared/card", locals: { class: "p-5" } do ... end
+    class: 내부 여백 등 추가 클래스(기본값 p-5 권장) %>
+<div class="rounded-xl border border-line bg-surface <%= local_assigns.fetch(:class, "p-5") %>">
+  <%= yield %>
+</div>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <%# 랜딩 전용 레이아웃 — 앱 셸(application.html.erb)과 분리: 하단탭 없음, 랜딩 전용 헤더·푸터 (PRD 13장) %>
+    <title><%= t("landing.meta.title") %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%# SEO 메타 (PRD 13.7) — og:url·og:image 등 도메인·에셋 의존 항목은 실제 확정 후 추가 %>
+    <meta name="description" content="<%= t("landing.meta.description") %>">
+    <meta property="og:title" content="<%= t("landing.meta.og_title") %>">
+    <meta property="og:description" content="<%= t("landing.meta.og_description") %>">
+    <meta property="og:type" content="website">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= yield :head %>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <%# Pretendard 웹폰트 — 앱 셸과 동일 체계(시스템 폰트 폴백, tailwind.config.js font-sans) %>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css" crossorigin>
+
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="min-h-dvh bg-canvas font-sans text-base leading-relaxed text-ink antialiased">
+    <%# 본문 바로가기 — 키보드 사용자용 (PRD 13.7 접근성) %>
+    <a href="#landing_main" class="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-brand-600 focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">
+      <%= t("landing.skip_to_content") %>
+    </a>
+
+    <%# 랜딩 헤더 — 로고 + 가입 CTA %>
+    <header class="sticky top-0 z-40 border-b border-line bg-surface">
+      <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-4">
+        <%= link_to "/", class: "-ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2", "aria-label": t("app_name") do %>
+          <svg class="h-6 w-6 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 21.5s-7.5-5.6-7.5-11a7.5 7.5 0 1 1 15 0c0 5.4-7.5 11-7.5 11z" fill="#3478F6" opacity="0.16"/>
+            <path d="M12 21.5s-7.5-5.6-7.5-11a7.5 7.5 0 1 1 15 0c0 5.4-7.5 11-7.5 11z" fill="#3478F6"/>
+            <circle cx="12" cy="10.5" r="2.6" fill="#FFFFFF"/>
+          </svg>
+          <span class="text-lg font-extrabold tracking-tight text-ink"><%= t("app_name") %></span>
+        <% end %>
+        <%= link_to t("landing.header.cta"), "#beta", class: "btn-primary", data: { event: "cta_hero" } %>
+      </div>
+    </header>
+
+    <main id="landing_main" class="mx-auto w-full max-w-6xl">
+      <%= render "shared/flash" %>
+      <%= yield %>
+    </main>
+
+    <%# 푸터 — 서비스 소개·문의 채널만 (PRD 13.8: 준비되지 않은 법정 고지는 임의 생성 금지) %>
+    <footer class="border-t border-line bg-surface">
+      <div class="mx-auto max-w-6xl px-4 py-10 md:py-12">
+        <div class="flex items-center gap-1.5">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 21.5s-7.5-5.6-7.5-11a7.5 7.5 0 1 1 15 0c0 5.4-7.5 11-7.5 11z" fill="#3478F6" opacity="0.16"/>
+            <path d="M12 21.5s-7.5-5.6-7.5-11a7.5 7.5 0 1 1 15 0c0 5.4-7.5 11-7.5 11z" fill="#3478F6"/>
+            <circle cx="12" cy="10.5" r="2.6" fill="#FFFFFF"/>
+          </svg>
+          <span class="text-base font-extrabold tracking-tight text-ink"><%= t("app_name") %></span>
+        </div>
+        <p class="mt-3 max-w-md text-sm leading-relaxed text-muted"><%= t("landing.footer.intro") %></p>
+        <p class="mt-4 text-sm text-muted">
+          <%= t("landing.footer.contact_title") %>:
+          <%= mail_to t("landing.footer.contact_email"), t("landing.footer.contact_email"),
+                class: "min-h-11 inline-flex items-center font-semibold text-brand-700 underline underline-offset-2" %>
+        </p>
+        <p class="mt-6 text-xs text-muted"><%= t("landing.footer.copyright") %></p>
+      </div>
+    </footer>
+  </body>
+</html>

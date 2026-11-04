@@ -1,0 +1,26 @@
+<%# 빈 상태 — '콕' 핀 모티프 + 안내 + 다음 액션 (PRD 15.4: 다음 액션 없는 빈 화면 금지)
+    사용: render "shared/empty_state", title: t("..."), description: t("..."),
+           cta_label: t("..."), cta_url: path, cta_variant: :primary
+    locals: title(필수), description, cta_label, cta_url, cta_variant(기본 :primary),
+            secondary_label·secondary_url(보조 텍스트 링크), class %>
+<div class="flex flex-col items-center rounded-xl border border-line bg-surface px-6 py-10 text-center <%= local_assigns[:class] %>">
+  <svg class="h-10 w-10 text-brand-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M12 21.5s-7.5-5.6-7.5-11a7.5 7.5 0 1 1 15 0c0 5.4-7.5 11-7.5 11z" fill="currentColor" opacity="0.15"/>
+    <path d="M12 21.5s-7.5-5.6-7.5-11a7.5 7.5 0 1 1 15 0c0 5.4-7.5 11-7.5 11z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+    <circle cx="12" cy="10.5" r="2.6" fill="currentColor"/>
+  </svg>
+  <p class="mt-4 text-base font-semibold text-ink"><%= title %></p>
+  <% if local_assigns[:description].present? %>
+    <p class="mt-1 text-sm leading-relaxed text-muted"><%= description %></p>
+  <% end %>
+  <% if local_assigns[:cta_label].present? && local_assigns[:cta_url].present? %>
+    <div class="mt-5">
+      <%= render "shared/button", label: cta_label, url: cta_url,
+            variant: local_assigns.fetch(:cta_variant, :primary) %>
+    </div>
+  <% end %>
+  <% if local_assigns[:secondary_label].present? && local_assigns[:secondary_url].present? %>
+    <%= link_to secondary_label, secondary_url,
+          class: "mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 underline underline-offset-2" %>
+  <% end %>
+</div>

@@ -1,0 +1,20 @@
+<%# 9. FAQ — 8문답 아코디언 (details/summary — JS 최소, PRD 13.3 시안 전문)
+    data-event="faq_open" (13.5 트래킹 지점 마크업) %>
+<section id="faq" class="scroll-mt-16 border-b border-line bg-surface">
+  <div class="mx-auto max-w-3xl px-4 py-12 md:py-20">
+    <h2 class="text-2xl font-extrabold tracking-tight text-ink md:text-3xl"><%= t("landing.faq.title") %></h2>
+    <div class="mt-6">
+      <% 1.upto(8) do |i| %>
+        <details class="group border-b border-line last:border-b-0" data-event="faq_open">
+          <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-4 text-left text-base font-semibold leading-relaxed text-ink [&::-webkit-details-marker]:hidden">
+            <span><%= t("landing.faq.q#{i}_question") %></span>
+            <svg class="h-5 w-5 shrink-0 text-muted transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6"/>
+            </svg>
+          </summary>
+          <p class="pb-4 text-sm leading-relaxed text-muted"><%= t("landing.faq.q#{i}_answer") %></p>
+        </details>
+      <% end %>
+    </div>
+  </div>
+</section>

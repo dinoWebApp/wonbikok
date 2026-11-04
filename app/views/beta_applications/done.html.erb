@@ -1,0 +1,13 @@
+<%# 신청 완료 화면 — PRD 13.6: 확인 안내 + 다음 단계.
+    확인되지 않은 SLA("24시간 내 연락" 등) 문구 금지. 중복 신청도 동일 화면으로 처리 %>
+<div class="mx-auto max-w-md px-4 py-16 text-center md:py-24">
+  <svg class="mx-auto h-14 w-14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="10" fill="#12B76A" opacity="0.14"/>
+    <path d="m7.5 12.5 3 3 6-6.5" stroke="#039855" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <h1 class="mt-5 text-2xl font-extrabold tracking-tight text-ink"><%= t("beta_applications.done.title") %></h1>
+  <p class="mt-4 text-base leading-relaxed text-muted"><%= t("beta_applications.done.body") %></p>
+  <div class="mt-8 flex justify-center">
+    <%= link_to t("beta_applications.done.back"), "/", class: "btn-secondary btn-lg" %>
+  </div>
+</div>

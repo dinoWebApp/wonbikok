@@ -1,0 +1,14 @@
+<%# 10. 최종 CTA — 전환 (PRD 13.2). 주요 CTA는 히어로와 동일 문구 하나로 고정 (13.5) %>
+<section class="border-b border-line bg-brand-50">
+  <div class="mx-auto max-w-3xl px-4 py-14 text-center md:py-20">
+    <h2 class="text-2xl font-extrabold leading-snug tracking-tight text-ink md:text-3xl md:leading-snug">
+      <%= t("landing.final.title") %>
+    </h2>
+    <p class="mt-3 text-base leading-relaxed text-muted"><%= t("landing.final.subtitle") %></p>
+    <div class="mt-7 flex justify-center">
+      <%= link_to t("landing.hero.cta"), "#beta",
+            class: "btn-primary btn-lg w-full md:w-auto md:px-6",
+            data: { event: "cta_final" } %>
+    </div>
+  </div>
+</section>

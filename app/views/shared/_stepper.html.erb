@@ -1,0 +1,31 @@
+<%# 온보딩 스텝퍼 — 진행 표시, 큰 터치 영역 아님(읽기 전용) (PRD 15.4 이탈 재개·한 화면 한 결정)
+    사용: render "shared/stepper", current: 1
+    current: 1~4 (1=사업자 정보, 2=납부 계좌, 3=연동 안내, 4=시작 모드) %>
+<%
+  step_labels = [
+    t("onboarding.steps.business"),
+    t("onboarding.steps.bank"),
+    t("onboarding.steps.link"),
+    t("onboarding.steps.practice")
+  ]
+  current = local_assigns.fetch(:current, 1).to_i
+%>
+<ol class="mb-6 grid grid-cols-4" aria-label="<%= t("onboarding.step_label", current: current) %>">
+  <% step_labels.each_with_index do |label, index| %>
+    <% number = index + 1 %>
+    <li class="flex flex-col items-center gap-1.5 text-center"
+        <%= tag.attributes("aria-current" => "step") if number == current %>>
+      <span class="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold
+                   <%= number < current ? "bg-brand-600 text-white" : (number == current ? "border-2 border-brand-600 bg-brand-50 text-brand-700" : "border border-line bg-surface text-muted") %>">
+        <% if number < current %>
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="m5.5 12.5 4 4L18.5 8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        <% else %>
+          <%= number %>
+        <% end %>
+      </span>
+      <span class="text-xs leading-tight <%= number == current ? "font-semibold text-brand-700" : "text-muted" %>"><%= label %></span>
+    </li>
+  <% end %>
+</ol>

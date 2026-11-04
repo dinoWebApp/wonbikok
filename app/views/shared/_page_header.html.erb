@@ -1,0 +1,19 @@
+<%# 화면 헤더 — 제목 + 설명 + 액션 영역 (PRD 16.4: 우선 CTA 명확, 경쟁 버튼 지양)
+    사용법:
+    - 액션 있음: render layout: "shared/page_header", locals: { title: t("...") } do ... 액션 버튼 ... end
+    - 액션 없음: render "shared/page_header", title: t("..."), description: t("...")
+    locals: title(필수), description, class %>
+<div class="mb-5 <%= local_assigns.fetch(:class, "") %>">
+  <div class="flex items-start justify-between gap-3">
+    <div class="min-w-0">
+      <h1 class="text-xl font-bold tracking-tight text-ink"><%= title %></h1>
+      <% if local_assigns[:description].present? %>
+        <p class="mt-1 text-sm leading-relaxed text-muted"><%= description %></p>
+      <% end %>
+    </div>
+    <% body = defined?(yield) ? yield : "" %>
+    <% if body.present? %>
+      <div class="flex shrink-0 items-center gap-2"><%= body %></div>
+    <% end %>
+  </div>
+</div>

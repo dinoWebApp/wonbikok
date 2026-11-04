@@ -1,0 +1,131 @@
+<%# 베타(파일럿) 신청 폼 — PRD 13.6
+    필수: 원장 이름·호칭, 연락 수단 1개(이메일/전화), 교습소 유형
+    선택: 원생 수 구간, 현재 원비 관리 방식, 가장 불편한 업무
+    동의: 개인정보 수집·이용(필수) / 마케팅 수신(선택·분리)
+    40~60대 접근성: 라벨·도움말·오류 안내 명확, 44px 터치 영역 (PRD 13.7·15.4) %>
+<%= form_with model: beta_application, class: "space-y-5",
+      data: { event: "form_start", turbo: true } do |form| %>
+  <% if beta_application.errors.any? %>
+    <%# 폼 오류 요약 — 색상+아이콘+텍스트 (PRD 16.2), 오류 이벤트 지점(13.5) %>
+    <div class="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert" data-event="form_error">
+      <p class="font-semibold"><%= t("errors.form") %></p>
+      <ul class="mt-1 list-disc pl-4">
+        <% beta_application.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <%= render layout: "shared/form_field", locals: { form: form, attr: :name,
+        label_text: t("beta_applications.form.name"), required: true } do %>
+    <%= form.text_field :name, autocomplete: "name", class: "field-input" %>
+  <% end %>
+
+  <%= render layout: "shared/form_field", locals: { form: form, attr: :title,
+        label_text: t("beta_applications.form.title"), required: true,
+        hint: t("beta_applications.form.title_hint") } do %>
+    <%= form.select :title,
+          BetaApplication::TITLE_OPTIONS.map { |key| [ t("enums.beta_application.title.#{key}"), key ] },
+          { include_blank: t("beta_applications.form.select_blank") }, class: "field-input" %>
+  <% end %>
+
+  <%# 연락 수단 — 이메일/전화 중 택 1 + 연락처 입력 %>
+  <fieldset>
+    <legend class="mb-1.5 flex items-baseline justify-between gap-2">
+      <span class="text-sm font-semibold text-ink"><%= t("beta_applications.form.contact_type") %></span>
+      <span class="text-xs font-semibold text-danger-600">(<%= t("common.required") %>)</span>
+    </legend>
+    <div class="grid grid-cols-2 gap-2">
+      <label class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-ink has-checked:border-brand-500 has-checked:bg-brand-50">
+        <%= form.radio_button :contact_type, "email", class: "h-4 w-4 accent-brand-600" %>
+        <%= t("beta_applications.form.contact_type_email") %>
+      </label>
+      <label class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-ink has-checked:border-brand-500 has-checked:bg-brand-50">
+        <%= form.radio_button :contact_type, "phone", class: "h-4 w-4 accent-brand-600" %>
+        <%= t("beta_applications.form.contact_type_phone") %>
+      </label>
+    </div>
+  </fieldset>
+
+  <%= render layout: "shared/form_field", locals: { form: form, attr: :contact_value,
+        label_text: t("beta_applications.form.contact_value"), required: true,
+        hint: t("beta_applications.form.contact_value_hint") } do %>
+    <%= form.text_field :contact_value, autocomplete: "email", inputmode: "email",
+          placeholder: t("beta_applications.form.contact_value_placeholder"), class: "field-input" %>
+  <% end %>
+
+  <%= render layout: "shared/form_field", locals: { form: form, attr: :academy_type,
+        label_text: t("beta_applications.form.academy_type"), required: true } do %>
+    <%= form.select :academy_type,
+          BetaApplication::ACADEMY_TYPE_OPTIONS.map { |key| [ t("enums.beta_application.academy_type.#{key}"), key ] },
+          { include_blank: t("beta_applications.form.select_blank") }, class: "field-input" %>
+  <% end %>
+
+  <%= render layout: "shared/form_field", locals: { form: form, attr: :student_count_range,
+        label_text: t("beta_applications.form.student_count_range"),
+        hint: t("beta_applications.form.student_count_range_hint") } do %>
+    <%= form.select :student_count_range,
+          BetaApplication::STUDENT_COUNT_RANGES.map { |key| [ t("enums.beta_application.student_count_range.#{key}"), key ] },
+          { include_blank: t("beta_applications.form.select_blank") }, class: "field-input" %>
+  <% end %>
+
+  <%= render layout: "shared/form_field", locals: { form: form, attr: :current_method,
+        label_text: t("beta_applications.form.current_method") } do %>
+    <%= form.text_area :current_method, rows: 2,
+          placeholder: t("beta_applications.form.current_method_placeholder"),
+          class: "w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-ink placeholder:text-muted placeholder:opacity-60 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" %>
+  <% end %>
+
+  <%= render layout: "shared/form_field", locals: { form: form, attr: :pain_point,
+        label_text: t("beta_applications.form.pain_point") } do %>
+    <%= form.text_area :pain_point, rows: 2,
+          placeholder: t("beta_applications.form.pain_point_placeholder"),
+          class: "w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-ink placeholder:text-muted placeholder:opacity-60 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" %>
+  <% end %>
+
+  <%# 동의 — 필수(수집·이용)와 선택(마케팅 수신) 분리 (13.6) %>
+  <div class="space-y-2 rounded-xl border border-line bg-canvas p-4">
+    <label class="flex items-start gap-2.5 text-sm leading-relaxed text-ink">
+      <%= form.check_box :terms_agreed, class: "mt-0.5 h-5 w-5 shrink-0 accent-brand-600" %>
+      <span>
+        <%= t("beta_applications.form.terms_agreed") %>
+        <strong class="font-semibold text-danger-600">(<%= t("common.required") %>)</strong>
+      </span>
+    </label>
+    <% if beta_application.errors[:terms_agreed].any? %>
+      <p class="text-sm font-medium text-danger-700"><%= beta_application.errors[:terms_agreed].first %></p>
+    <% end %>
+    <label class="flex items-start gap-2.5 text-sm leading-relaxed text-ink">
+      <%= form.check_box :marketing_agreed, class: "mt-0.5 h-5 w-5 shrink-0 accent-brand-600" %>
+      <span><%= t("beta_applications.form.marketing_agreed") %></span>
+    </label>
+  </div>
+
+  <%# 연락처는 암호화 저장(TEN-003) — 폼 하단 고지로 수집 항목을 명시 %>
+  <p class="text-xs leading-relaxed text-muted"><%= t("beta_applications.form.privacy_note") %></p>
+
+  <%= form.submit t("beta_applications.form.submit"),
+        class: "btn-primary btn-lg w-full", data: { event: "form_submit" } %>
+<% end %>
+
+<%# INFO-5 접근성(15.4) — 연락 수단 라디오에 따라 키보드·자동완성 힌트를 전환한다(40~60대 사용성).
+    두 입력을 CSS로 전환하는 방식은 숨김 input도 제출되어 params가 덮어쓰이므로,
+    단일 입력의 속성만 바꾸는 미니 인라인 스크립트(위임 없이 라디오에 직접 바인딩)를 택함 %>
+<script>
+  (function () {
+    var radios = document.querySelectorAll('input[name="beta_application[contact_type]"]');
+    var field = document.querySelector('input[name="beta_application[contact_value]"]');
+    if (radios.length === 0 || !field) return;
+
+    var apply = function () {
+      var phone = document.querySelector('input[name="beta_application[contact_type]"][value="phone"]');
+      var isPhone = !!(phone && phone.checked);
+      field.setAttribute("inputmode", isPhone ? "tel" : "email");
+      field.setAttribute("autocomplete", isPhone ? "tel" : "email");
+    };
+
+    apply(); <%# 422 재렌더 등 phone이 서버에서 선택된 초기 상태 반영 %>
+    radios.forEach(function (radio) { radio.addEventListener("change", apply); });
+  })();
+</script>

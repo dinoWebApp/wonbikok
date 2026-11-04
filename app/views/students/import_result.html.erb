@@ -1,30 +1,37 @@
-<h1 class="text-xl font-bold mb-4"><%= t("students.import.result_title") %></h1>
+<%= render "shared/page_header", title: t("students.import.result_title") %>
 
-<div class="rounded-xl border border-slate-200 bg-white p-5 mb-4">
-  <div class="flex gap-6 text-sm">
-    <p><span class="text-emerald-700 font-semibold"><%= t("students.import.success", count: @result.success_count) %></span></p>
-    <p><span class="text-red-700 font-semibold"><%= t("students.import.failed", count: @result.errors.size) %></span></p>
+<%# 결과 요약 — 성공/실패 수를 색상+텍스트로 구분 (PRD 16.2) %>
+<%= render layout: "shared/card", locals: { class: "p-5" } do %>
+  <div class="grid grid-cols-2 gap-3">
+    <div class="rounded-lg bg-success-50 px-4 py-3">
+      <p class="text-sm font-semibold text-success-700"><%= t("students.import.success", count: @result.success_count) %></p>
+    </div>
+    <div class="rounded-lg bg-danger-50 px-4 py-3 text-right">
+      <p class="text-sm font-semibold tabular-nums text-danger-700"><%= t("students.import.failed", count: @result.errors.size) %></p>
+    </div>
   </div>
-</div>
+<% end %>
 
 <% if @result.errors.any? %>
-  <div class="rounded-xl border border-red-200 bg-white p-5 mb-4">
-    <h2 class="font-semibold mb-2"><%= t("students.import.error_detail_title") %></h2>
-    <ul class="text-sm space-y-1">
+  <div class="mt-4 rounded-xl border border-danger-200 bg-surface p-5">
+    <h2 class="text-sm font-bold text-ink"><%= t("students.import.error_detail_title") %></h2>
+    <ul class="mt-2 space-y-1.5 text-sm">
       <% @result.errors.each do |error| %>
-        <li class="text-red-700">
-          <%= t("students.import.error_line", line: error.line) %>: <%= error.reasons.join(" / ") %>
+        <li class="text-danger-700">
+          <span class="font-semibold tabular-nums"><%= t("students.import.error_line", line: error.line) %></span>: <%= error.reasons.join(" / ") %>
         </li>
       <% end %>
     </ul>
   </div>
 
-  <div class="flex flex-col gap-2">
-    <%= link_to t("students.import.download_errors"), import_errors_students_path,
-          class: "min-h-11 px-4 flex items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-800 text-sm font-semibold" %>
-    <p class="text-xs text-slate-500"><%= t("students.import.errors_reupload_notice") %></p>
+  <div class="mt-4 space-y-2">
+    <%= render "shared/button", label: t("students.import.download_errors"),
+          url: import_errors_students_path, variant: :destructive_secondary, class: "w-full" %>
+    <p class="text-xs leading-relaxed text-muted"><%= t("students.import.errors_reupload_notice") %></p>
   </div>
 <% else %>
-  <%= link_to t("students.import.back_to_list"), students_path,
-        class: "min-h-11 px-4 inline-flex items-center rounded-lg bg-slate-900 text-white text-sm font-semibold" %>
+  <div class="mt-4">
+    <%= render "shared/button", label: t("students.import.back_to_list"),
+          url: students_path, variant: :primary, size: :lg, class: "w-full" %>
+  </div>
 <% end %>

@@ -1,21 +1,35 @@
-<h1 class="text-xl font-bold mb-6"><%= t("session.new.title") %></h1>
-
-<%= form_with url: session_path, method: :post, class: "space-y-5" do |form| %>
-  <div>
-    <%= form.label :phone_number, t("session.new.phone_number"), class: "block font-semibold mb-1" %>
-    <%= form.text_field :phone_number, inputmode: "numeric", autocomplete: "tel",
-          class: "w-full min-h-11 rounded-lg border border-slate-300 px-3 text-base" %>
+<div class="mx-auto w-full max-w-sm pt-6 md:pt-14">
+  <%# 로고 — '콕' 핀 모티프 (PRD 16.0) %>
+  <div class="mb-8 flex flex-col items-center text-center">
+    <svg class="h-12 w-12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 21.5s-7.5-5.6-7.5-11a7.5 7.5 0 1 1 15 0c0 5.4-7.5 11-7.5 11z" fill="#3478F6" opacity="0.16"/>
+      <path d="M12 21.5s-7.5-5.6-7.5-11a7.5 7.5 0 1 1 15 0c0 5.4-7.5 11-7.5 11z" fill="#3478F6"/>
+      <circle cx="12" cy="10.5" r="2.6" fill="#FFFFFF"/>
+    </svg>
+    <h1 class="mt-3 text-2xl font-extrabold tracking-tight text-ink"><%= t("session.new.title") %></h1>
+    <p class="mt-1 text-sm text-muted"><%= t("tagline") %></p>
   </div>
-  <div>
-    <%= form.label :password, t("session.new.password"), class: "block font-semibold mb-1" %>
-    <%= form.password_field :password, autocomplete: "current-password",
-          class: "w-full min-h-11 rounded-lg border border-slate-300 px-3 text-base" %>
-  </div>
-  <%= form.submit t("session.new.submit"),
-        class: "w-full min-h-12 rounded-lg bg-indigo-600 text-white font-semibold text-base hover:bg-indigo-700" %>
-<% end %>
 
-<p class="mt-6 text-slate-600">
-  <%= t("session.new.no_account") %>
-  <%= link_to t("auth.sign_up"), new_registration_path, class: "text-indigo-600 font-semibold min-h-11 inline-flex items-center" %>
-</p>
+  <%= render layout: "shared/card", locals: { class: "p-5" } do %>
+    <%= form_with url: session_path, method: :post, class: "space-y-5" do |form| %>
+      <%= render layout: "shared/form_field", locals: { form: form, attr: :phone_number,
+            label_text: t("session.new.phone_number"), required: true } do %>
+        <%= form.text_field :phone_number, inputmode: "numeric", autocomplete: "tel",
+              class: "field-input" %>
+      <% end %>
+      <%= render layout: "shared/form_field", locals: { form: form, attr: :password,
+            label_text: t("session.new.password"), required: true } do %>
+        <%= form.password_field :password, autocomplete: "current-password",
+              class: "field-input" %>
+      <% end %>
+      <%= form.submit t("session.new.submit"),
+            class: "btn-primary btn-lg w-full" %>
+    <% end %>
+  <% end %>
+
+  <p class="mt-6 text-center text-sm text-muted">
+    <%= t("session.new.no_account") %>
+    <%= link_to t("auth.sign_up"), new_registration_path,
+          class: "inline-flex min-h-11 items-center font-semibold text-brand-700 underline underline-offset-2" %>
+  </p>
+</div>

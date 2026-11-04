@@ -2,9 +2,10 @@
       url: confirm ? students_path(confirm: "1") : (student.persisted? ? student_path(student) : students_path),
       class: "space-y-4" do |form| %>
   <% if student.errors.any? %>
-    <div class="rounded-lg bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">
-      <p><%= t("errors.form") %></p>
-      <ul class="mt-1 list-disc list-inside">
+    <%# 폼 오류 요약 — 색상+아이콘+텍스트 (PRD 16.2) %>
+    <div class="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
+      <p class="font-semibold"><%= t("errors.form") %></p>
+      <ul class="mt-1 list-disc pl-4">
         <% student.errors.full_messages.each do |message| %>
           <li><%= message %></li>
         <% end %>
@@ -12,88 +13,74 @@
     </div>
   <% end %>
 
-  <div class="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
-    <div>
-      <%= form.label :name, class: "block text-sm font-semibold mb-1" %>
-      <%= form.text_field :name, required: true,
-            class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
-    </div>
-    <div>
-      <%= form.label :grade, class: "block text-sm font-semibold mb-1" %>
+  <%= render layout: "shared/card", locals: { class: "p-5 space-y-4" } do %>
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :name,
+          label_text: Student.human_attribute_name(:name), required: true } do %>
+      <%= form.text_field :name, required: true, class: "field-input" %>
+    <% end %>
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :grade,
+          label_text: Student.human_attribute_name(:grade) } do %>
       <%= form.text_field :grade, placeholder: t("students.form.grade_placeholder"),
-            class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
-    </div>
+            class: "field-input" %>
+    <% end %>
     <div class="grid grid-cols-2 gap-3">
-      <div>
-        <%= form.label :monthly_fee, class: "block text-sm font-semibold mb-1" %>
+      <%= render layout: "shared/form_field", locals: { form: form, attr: :monthly_fee,
+            label_text: Student.human_attribute_name(:monthly_fee), class: "" } do %>
         <%= form.number_field :monthly_fee, min: 0, step: 1000,
-              class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
-      </div>
-      <div>
-        <%= form.label :payment_day, class: "block text-sm font-semibold mb-1" %>
+              class: "field-input text-right tabular-nums" %>
+      <% end %>
+      <%= render layout: "shared/form_field", locals: { form: form, attr: :payment_day,
+            label_text: Student.human_attribute_name(:payment_day) } do %>
         <%= form.number_field :payment_day, min: 1, max: 28,
-              class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
-      </div>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <%= form.label :payment_type, class: "block text-sm font-semibold mb-1" %>
-        <%= form.select :payment_type, Student.payment_types.keys.map { |key| [ t("students.payment_type.#{key}"), key ] }, {},
-              class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
-      </div>
-      <% if student.persisted? %>
-        <div>
-          <%= form.label :status, class: "block text-sm font-semibold mb-1" %>
-          <%= form.select :status, Student.statuses.keys.map { |key| [ t("students.status.#{key}"), key ] }, {},
-                class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
-        </div>
+              class: "field-input text-right tabular-nums" %>
       <% end %>
     </div>
-    <div>
-      <%= form.label :started_on, class: "block text-sm font-semibold mb-1" %>
-      <%= form.date_field :started_on,
-            class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
+    <div class="grid grid-cols-2 gap-3">
+      <%= render layout: "shared/form_field", locals: { form: form, attr: :payment_type,
+            label_text: Student.human_attribute_name(:payment_type) } do %>
+        <%= form.select :payment_type, Student.payment_types.keys.map { |key| [ t("students.payment_type.#{key}"), key ] }, {},
+              class: "field-input" %>
+      <% end %>
+      <% if student.persisted? %>
+        <%= render layout: "shared/form_field", locals: { form: form, attr: :status,
+              label_text: Student.human_attribute_name(:status) } do %>
+          <%= form.select :status, Student.statuses.keys.map { |key| [ t("students.status.#{key}"), key ] }, {},
+                class: "field-input" %>
+        <% end %>
+      <% end %>
     </div>
-    <div>
-      <%= form.label :memo, class: "block text-sm font-semibold mb-1" %>
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :started_on,
+          label_text: Student.human_attribute_name(:started_on) } do %>
+      <%= form.date_field :started_on, class: "field-input" %>
+    <% end %>
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :memo,
+          label_text: Student.human_attribute_name(:memo) } do %>
       <%= form.text_area :memo, rows: 2,
-            class: "w-full rounded-lg border border-slate-300 px-3 py-2 text-base" %>
-    </div>
-  </div>
+            class: "w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" %>
+    <% end %>
+  <% end %>
 
   <% guardian = student.guardians.first || student.guardians.build %>
-  <div class="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
-    <p class="text-sm font-semibold"><%= t("students.form.guardian_section") %></p>
+  <%= render layout: "shared/card", locals: { class: "p-5 space-y-4" } do %>
+    <p class="text-sm font-bold text-ink"><%= t("students.form.guardian_section") %></p>
     <%= fields_for "student[guardians_attributes][]", guardian do |guardian_form| %>
       <%= guardian_form.hidden_field :id %>
-      <div>
-        <%= guardian_form.label :name, t("activerecord.attributes.guardian.name"),
-              class: "block text-sm font-semibold mb-1" %>
-        <%= guardian_form.text_field :name,
-              class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
-      </div>
-      <div>
-        <%= guardian_form.label :phone_number, t("activerecord.attributes.guardian.phone_number"),
-              class: "block text-sm font-semibold mb-1" %>
+      <%= render layout: "shared/form_field", locals: { form: guardian_form, attr: :name,
+            label_text: Guardian.human_attribute_name(:name), required: true } do %>
+        <%= guardian_form.text_field :name, class: "field-input" %>
+      <% end %>
+      <%= render layout: "shared/form_field", locals: { form: guardian_form, attr: :phone_number,
+            label_text: Guardian.human_attribute_name(:phone_number), required: true,
+            hint: t("students.form.phone_notice") } do %>
         <%= guardian_form.telephone_field :phone_number, inputmode: "numeric",
-              placeholder: "01012345678",
-              class: "min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base" %>
-      </div>
+              placeholder: "01012345678", class: "field-input" %>
+      <% end %>
     <% end %>
-    <% if guardian.errors.any? %>
-      <ul class="list-disc list-inside text-sm text-red-700">
-        <% guardian.errors.full_messages.each do |message| %>
-          <li><%= message %></li>
-        <% end %>
-      </ul>
-    <% end %>
-    <p class="text-xs text-slate-500"><%= t("students.form.phone_notice") %></p>
-  </div>
+  <% end %>
 
   <div class="flex gap-2">
-    <%= form.submit t("common.save"),
-          class: "min-h-11 flex-1 rounded-lg bg-slate-900 text-white font-semibold text-sm" %>
+    <%= form.submit t("common.save"), class: "btn-primary btn-lg flex-1" %>
     <%= link_to t("common.cancel"), student.persisted? ? student_path(student) : students_path,
-          class: "min-h-11 px-4 flex items-center rounded-lg border border-slate-300 bg-white text-sm text-slate-700" %>
+          class: "btn-secondary btn-lg" %>
   </div>
 <% end %>

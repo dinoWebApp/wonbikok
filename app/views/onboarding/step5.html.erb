@@ -1,21 +1,25 @@
-<p class="text-sm text-indigo-600 font-semibold mb-1"><%= t("onboarding.step_label", current: 4) %></p>
-<h1 class="text-xl font-bold mb-1"><%= t("onboarding.practice.title") %></h1>
-<p class="text-slate-600 mb-6"><%= t("onboarding.practice.description") %></p>
+<%= render "shared/stepper", current: 4 %>
+
+<div class="mb-5">
+  <h1 class="text-xl font-bold tracking-tight text-ink"><%= t("onboarding.practice.title") %></h1>
+  <p class="mt-1 text-sm leading-relaxed text-muted"><%= t("onboarding.practice.description") %></p>
+</div>
 
 <div class="space-y-4">
+  <%# 연습 모드(권장 경로) — 실발송·실발행 없음 (PRD 15.5) %>
   <%= form_with url: onboarding_step_path(5), method: :patch, class: "block" do %>
     <button type="submit" name="commit" value="practice"
-            class="w-full min-h-12 rounded-lg bg-indigo-600 text-white font-semibold text-base hover:bg-indigo-700">
+            class="btn-primary btn-lg w-full">
       <%= t("onboarding.practice.practice") %>
     </button>
-    <p class="mt-1 text-sm text-slate-600"><%= t("onboarding.practice.practice_hint") %></p>
+    <p class="mt-1.5 text-sm leading-relaxed text-muted"><%= t("onboarding.practice.practice_hint") %></p>
   <% end %>
 
-  <%= form_with url: onboarding_step_path(5), method: :patch, class: "block mt-8" do %>
+  <%= form_with url: onboarding_step_path(5), method: :patch, class: "block pt-6" do %>
     <button type="submit" name="commit" value="real"
-            class="w-full min-h-12 rounded-lg border border-slate-300 bg-white text-slate-800 font-semibold text-base hover:bg-slate-50">
+            class="btn-secondary btn-lg w-full">
       <%= t("onboarding.practice.real") %>
     </button>
-    <p class="mt-1 text-sm text-slate-600"><%= t("onboarding.practice.real_hint") %></p>
+    <p class="mt-1.5 text-sm leading-relaxed text-muted"><%= t("onboarding.practice.real_hint") %></p>
   <% end %>
 </div>

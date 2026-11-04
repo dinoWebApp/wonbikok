@@ -73,6 +73,6 @@ class InvoicesFlowSmokeTest < ActionDispatch::IntegrationTest
 
   def log_in_as(user)
     post session_url, params: { session: { phone_number: "01099998888", password: "password123" } }
-    assert_redirected_to root_path
+    assert_redirected_to dashboard_path # 2026-11-04: 루트가 랜딩으로 이동 — 로그인 후 앱 홈은 /dashboard
   end
 end

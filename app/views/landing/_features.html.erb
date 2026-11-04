@@ -1,0 +1,67 @@
+<%# 4. 핵심 기능 — 3카드 + CSS 미니 목업 (실 스크린샷 부재 → 목업·alt 제공, 13.2·13.7)
+    현금영수증은 "연동 준비 중" 병기 (13.4 — 미제공 기능 명확히) %>
+<section class="border-b border-line">
+  <div class="mx-auto max-w-6xl px-4 py-12 md:py-20">
+    <h2 class="text-2xl font-extrabold tracking-tight text-ink md:text-3xl"><%= t("landing.features.title") %></h2>
+    <p class="mt-3 text-base leading-relaxed text-muted"><%= t("landing.features.subtitle") %></p>
+    <div class="mt-8 grid gap-4 md:grid-cols-3 md:gap-5">
+
+      <%# 기능 1 — 납부 안내 알림톡 %>
+      <%= render layout: "shared/card", locals: { class: "p-5" } do %>
+        <div class="rounded-xl border border-line bg-canvas p-3" role="img"
+             aria-label="<%= t("landing.features.alimtalk.mockup_aria") %>">
+          <div class="rounded-lg rounded-tl-sm border border-line bg-surface px-3 py-2.5">
+            <p class="text-xs font-bold text-ink"><%= t("landing.features.alimtalk.mockup_title") %></p>
+            <p class="mt-1 text-xs leading-relaxed text-muted"><%= t("landing.features.alimtalk.mockup_body") %></p>
+            <div class="mt-2 flex justify-center">
+              <span class="rounded-md bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700"><%= t("landing.features.alimtalk.mockup_button") %></span>
+            </div>
+          </div>
+        </div>
+        <p class="mt-4 text-base font-bold text-ink"><%= t("landing.features.alimtalk.title") %></p>
+        <p class="mt-2 text-sm leading-relaxed text-muted"><%= t("landing.features.alimtalk.copy") %></p>
+      <% end %>
+
+      <%# 기능 2 — 미납 리마인더 %>
+      <%= render layout: "shared/card", locals: { class: "p-5" } do %>
+        <div class="rounded-xl border border-line bg-canvas p-3" role="img"
+             aria-label="<%= t("landing.features.reminder.mockup_aria") %>">
+          <ul class="space-y-2">
+            <li class="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface px-3 py-2">
+              <span class="text-sm font-semibold text-ink"><%= t("landing.features.reminder.mockup_name1") %></span>
+              <span class="rounded-full border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-semibold text-warning-700"><%= t("landing.features.reminder.mockup_badge_d3") %></span>
+            </li>
+            <li class="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface px-3 py-2">
+              <span class="text-sm font-semibold text-ink"><%= t("landing.features.reminder.mockup_name2") %></span>
+              <span class="rounded-full border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-semibold text-warning-700"><%= t("landing.features.reminder.mockup_badge_d7") %></span>
+            </li>
+          </ul>
+        </div>
+        <p class="mt-4 text-base font-bold text-ink"><%= t("landing.features.reminder.title") %></p>
+        <p class="mt-2 text-sm leading-relaxed text-muted"><%= t("landing.features.reminder.copy") %></p>
+      <% end %>
+
+      <%# 기능 3 — 현금영수증 자동 발행 (연동 준비 중 병기) %>
+      <%= render layout: "shared/card", locals: { class: "p-5" } do %>
+        <div class="rounded-xl border border-line bg-canvas p-3" role="img"
+             aria-label="<%= t("landing.features.receipt.mockup_aria") %>">
+          <div class="rounded-lg border border-line bg-surface px-3 py-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-xs font-bold text-ink"><%= t("landing.features.receipt.mockup_title") %></p>
+              <span class="inline-flex items-center gap-1 rounded-full border border-success-200 bg-success-50 px-2 py-0.5 text-xs font-semibold text-success-700">
+                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+                <%= t("landing.features.receipt.mockup_badge") %>
+              </span>
+            </div>
+            <p class="mt-2 text-xs text-muted"><%= t("landing.features.receipt.mockup_no") %></p>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center gap-2">
+          <p class="text-base font-bold text-ink"><%= t("landing.features.receipt.title") %></p>
+          <span class="rounded-full border border-line bg-canvas px-2 py-0.5 text-xs font-semibold text-muted"><%= t("landing.features.receipt.pending") %></span>
+        </div>
+        <p class="mt-2 text-sm leading-relaxed text-muted"><%= t("landing.features.receipt.copy") %></p>
+      <% end %>
+    </div>
+  </div>
+</section>

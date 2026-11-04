@@ -1,6 +1,16 @@
 Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # 랜딩 (루트) — 비인증 렌더, 인증 원장은 /dashboard 리다이렉트 (PRD 13장, 2026-11-04 확정)
+  root "landing#show"
+
+  # 베타(파일럿) 신청 — 랜딩 공개 폼 (PRD 13.6)
+  resources :beta_applications, only: %i[new create] do
+    collection do
+      get :done # 신청 완료 화면(리다이렉트 대상 — PRG 패턴)
+    end
+  end
+
   # 원장 인증 (가입·로그인·로그아웃)
   resource :registration, only: %i[new create]
   resource :session, only: %i[new create destroy]
@@ -50,6 +60,6 @@ Rails.application.routes.draw do
   patch "reminders/students/:student_id/remind_exclusion", to: "reminders#toggle_exclusion",
         as: :reminder_student_exclusion # 원생별 제외/해제 (MSG-004)
 
-  # 대시보드 (루트: 인증 상태별 분기)
-  root "dashboard#show"
+  # 대시보드 (인증 후 앱 홈 — 루트가 랜딩으로 바뀌면서 이동, 2026-11-04)
+  get "/dashboard", to: "dashboard#show", as: :dashboard
 end

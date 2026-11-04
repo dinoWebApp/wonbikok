@@ -42,7 +42,8 @@ class SessionsController < ApplicationController
 
   def redirect_after_login
     if current_tenant.onboarding_complete?
-      redirect_to root_path, status: :see_other
+      # 앱 홈(/dashboard)으로 — 루트(/)는 랜딩이므로 인증 리다이렉트 대상이 아니다(2026-11-04 라우트 이동)
+      redirect_to dashboard_path, status: :see_other
     else
       redirect_to onboarding_step_path(resume_onboarding_step), status: :see_other
     end

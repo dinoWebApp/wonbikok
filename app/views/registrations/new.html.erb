@@ -1,44 +1,42 @@
-<h1 class="text-xl font-bold mb-1"><%= t("registration.title") %></h1>
-<p class="text-slate-600 mb-6"><%= t("registration.description") %></p>
+<div class="mx-auto w-full max-w-sm pt-6 md:pt-14">
+  <div class="mb-6">
+    <h1 class="text-2xl font-extrabold tracking-tight text-ink"><%= t("registration.title") %></h1>
+    <p class="mt-1 text-sm leading-relaxed text-muted"><%= t("registration.description") %></p>
+  </div>
 
-<%= form_with model: @user, url: registration_path, class: "space-y-5" do |form| %>
-  <%= fields model: @tenant do |tenant_form| %>
-    <div>
-      <%= tenant_form.label :name, t("registration.tenant_name"), class: "block font-semibold mb-1" %>
-      <%= tenant_form.text_field :name, class: "w-full min-h-11 rounded-lg border border-slate-300 px-3 text-base" %>
-      <% @tenant.errors[:name].each do |message| %>
-        <p class="mt-1 text-sm text-red-600"><%= message %></p>
+  <%= render layout: "shared/card", locals: { class: "p-5" } do %>
+    <%= form_with model: @user, url: registration_path, class: "space-y-5" do |form| %>
+      <%= fields model: @tenant do |tenant_form| %>
+        <%= render layout: "shared/form_field", locals: { form: tenant_form, attr: :name,
+              label_text: t("registration.tenant_name"), required: true } do %>
+          <%= tenant_form.text_field :name, class: "field-input" %>
+        <% end %>
       <% end %>
-    </div>
+
+      <%= render layout: "shared/form_field", locals: { form: form, attr: :phone_number,
+            label_text: t("registration.phone_number"), required: true } do %>
+        <%= form.text_field :phone_number, inputmode: "numeric", autocomplete: "tel",
+              class: "field-input" %>
+      <% end %>
+      <%= render layout: "shared/form_field", locals: { form: form, attr: :password,
+            label_text: t("registration.password"), required: true } do %>
+        <%= form.password_field :password, autocomplete: "new-password",
+              class: "field-input" %>
+      <% end %>
+      <%= render layout: "shared/form_field", locals: { form: form, attr: :password_confirmation,
+            label_text: t("registration.password_confirmation"), required: true } do %>
+        <%= form.password_field :password_confirmation, autocomplete: "new-password",
+              class: "field-input" %>
+      <% end %>
+
+      <%= form.submit t("registration.submit"),
+            class: "btn-primary btn-lg w-full" %>
+    <% end %>
   <% end %>
 
-  <div>
-    <%= form.label :phone_number, t("registration.phone_number"), class: "block font-semibold mb-1" %>
-    <%= form.text_field :phone_number, inputmode: "numeric", autocomplete: "tel",
-          class: "w-full min-h-11 rounded-lg border border-slate-300 px-3 text-base" %>
-    <% @user.errors[:phone_number].each do |message| %>
-      <p class="mt-1 text-sm text-red-600"><%= message %></p>
-    <% end %>
-  </div>
-  <div>
-    <%= form.label :password, t("registration.password"), class: "block font-semibold mb-1" %>
-    <%= form.password_field :password, autocomplete: "new-password",
-          class: "w-full min-h-11 rounded-lg border border-slate-300 px-3 text-base" %>
-    <% @user.errors[:password].each do |message| %>
-      <p class="mt-1 text-sm text-red-600"><%= message %></p>
-    <% end %>
-  </div>
-  <div>
-    <%= form.label :password_confirmation, t("registration.password_confirmation"), class: "block font-semibold mb-1" %>
-    <%= form.password_field :password_confirmation, autocomplete: "new-password",
-          class: "w-full min-h-11 rounded-lg border border-slate-300 px-3 text-base" %>
-  </div>
-
-  <%= form.submit t("registration.submit"),
-        class: "w-full min-h-12 rounded-lg bg-indigo-600 text-white font-semibold text-base hover:bg-indigo-700" %>
-<% end %>
-
-<p class="mt-6 text-slate-600">
-  <%= t("registration.have_account") %>
-  <%= link_to t("auth.sign_in"), new_session_path, class: "text-indigo-600 font-semibold min-h-11 inline-flex items-center" %>
-</p>
+  <p class="mt-6 text-center text-sm text-muted">
+    <%= t("registration.have_account") %>
+    <%= link_to t("auth.sign_in"), new_session_path,
+          class: "inline-flex min-h-11 items-center font-semibold text-brand-700 underline underline-offset-2" %>
+  </p>
+</div>

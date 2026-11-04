@@ -6,7 +6,7 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
 
     log_in(user)
 
-    assert_redirected_to root_path
+    assert_redirected_to dashboard_path # 2026-11-04: 루트가 랜딩으로 이동 — 로그인 후 앱 홈은 /dashboard
     follow_redirect!
     assert_response :ok
   end

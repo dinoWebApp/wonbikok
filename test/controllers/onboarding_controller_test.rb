@@ -15,7 +15,7 @@ class OnboardingControllerTest < ActionDispatch::IntegrationTest
     log_in(user)
     assert_redirected_to onboarding_step_path(2)
 
-    get root_path
+    get dashboard_path # 2026-11-04: 루트가 랜딩으로 이동 — 앱 홈 접근은 /dashboard 경유
     assert_redirected_to onboarding_step_path(2)
     follow_redirect!
     assert_response :ok
@@ -36,10 +36,10 @@ class OnboardingControllerTest < ActionDispatch::IntegrationTest
     _tenant, user = create_owner_user(step: 6)
     log_in(user)
 
-    assert_redirected_to root_path
+    assert_redirected_to dashboard_path # 2026-11-04: 루트가 랜딩으로 이동 — 앱 홈은 /dashboard
 
     get onboarding_step_path(2)
-    assert_redirected_to root_path
+    assert_redirected_to dashboard_path
   end
 
   # WARNING-1: 스텝 우회 차단 — 현재 스텝+1 초과 접근은 현재 스텝으로 되돌린다
@@ -87,7 +87,7 @@ class OnboardingControllerTest < ActionDispatch::IntegrationTest
       patch onboarding_step_path(5), params: { commit: "practice" }
     end
 
-    assert_redirected_to root_path
+    assert_redirected_to dashboard_path # 2026-11-04: 루트가 랜딩으로 이동 — 온보딩 완료 후 앱 홈은 /dashboard
     assert tenant.reload.practice?
     assert_equal 6, tenant.onboarding_step
   end

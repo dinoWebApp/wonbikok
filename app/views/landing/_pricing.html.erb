@@ -1,0 +1,85 @@
+<%# 8. 요금제 — 2플랜 카드 + 월간/연간 토글 (PRD 11.1 표 기반, 13.2)
+    토글: 라디오 2개 + Tailwind named peer 변형만 (JS 없음). 연간은 "약 2개월 할인" 표기
+    "파일럿 검증 전 가격" 각주 (PRD 11장 전제 — 검증 전 가설 가격) %>
+<section id="pricing" class="scroll-mt-16 border-b border-line">
+  <div class="mx-auto max-w-6xl px-4 py-12 md:py-20">
+    <h2 class="text-2xl font-extrabold tracking-tight text-ink md:text-3xl"><%= t("landing.pricing.title") %></h2>
+    <p class="mt-3 text-base leading-relaxed text-muted"><%= t("landing.pricing.subtitle") %></p>
+
+    <%# 플랜 데이터 — PRD 11.1 플랜 구조 표 기반 %>
+    <% light_plan = {
+         name: t("landing.pricing.plan_light"),
+         monthly_price: t("landing.pricing.plan_light_month_price"),
+         annual_price: t("landing.pricing.plan_light_annual_price"),
+         rows: [
+           [t("landing.pricing.plan_row_students"), t("landing.pricing.plan_students_30")],
+           [t("landing.pricing.plan_row_alimtalk"), t("landing.pricing.plan_alimtalk_300")],
+           [t("landing.pricing.plan_row_cycle"), t("landing.pricing.plan_supported")],
+           [t("landing.pricing.plan_row_reminder"), t("landing.pricing.plan_reminder_basic")],
+           [t("landing.pricing.plan_row_receipt"), t("landing.pricing.plan_supported_pending")],
+           [t("landing.pricing.plan_row_proof_issue"), t("landing.pricing.plan_not_supported")],
+           [t("landing.pricing.plan_row_report"), t("landing.pricing.plan_not_supported")],
+           [t("landing.pricing.plan_row_csv"), t("landing.pricing.plan_supported")]
+         ]
+       } %>
+    <% standard_plan = {
+         name: t("landing.pricing.plan_standard"),
+         monthly_price: t("landing.pricing.plan_standard_month_price"),
+         annual_price: t("landing.pricing.plan_standard_annual_price"),
+         rows: [
+           [t("landing.pricing.plan_row_students"), t("landing.pricing.plan_students_70")],
+           [t("landing.pricing.plan_row_alimtalk"), t("landing.pricing.plan_alimtalk_1000")],
+           [t("landing.pricing.plan_row_cycle"), t("landing.pricing.plan_supported")],
+           [t("landing.pricing.plan_row_reminder"), t("landing.pricing.plan_reminder_custom")],
+           [t("landing.pricing.plan_row_receipt"), t("landing.pricing.plan_supported_pending")],
+           [t("landing.pricing.plan_row_proof_issue"), t("landing.pricing.plan_supported")],
+           [t("landing.pricing.plan_row_report"), t("landing.pricing.plan_supported")],
+           [t("landing.pricing.plan_row_csv"), t("landing.pricing.plan_supported")]
+         ]
+       } %>
+
+    <%# 결제 주기 토글 — sr-only 라디오 + 라벨 + 가격 그룹이 "모두 형제"여야
+        peer-checked 변형이 동작한다(Tailwind peer는 형제 결합자). 그룹 표시 전환용
+        래퍼와 카드 배치용 grid를 분리해 display 유틸리티 충돌을 방지한다 %>
+    <div class="mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-4">
+      <%= radio_button_tag :billing_cycle, "monthly", true, id: "billing_monthly",
+            class: "peer/monthly sr-only" %>
+      <label for="billing_monthly"
+             class="peer-checked/monthly:border-brand-600 peer-checked/monthly:bg-brand-600 peer-checked/monthly:text-white peer-focus-visible/monthly:outline-2 peer-focus-visible/monthly:outline-offset-2 peer-focus-visible/monthly:outline-brand-600 inline-flex min-h-11 cursor-pointer items-center rounded-full border border-line bg-surface px-4 text-sm font-semibold text-muted">
+        <%= t("landing.pricing.monthly_label") %>
+      </label>
+      <%= radio_button_tag :billing_cycle, "annual", false, id: "billing_annual",
+            class: "peer/annual sr-only" %>
+      <label for="billing_annual"
+             class="peer-checked/annual:border-brand-600 peer-checked/annual:bg-brand-600 peer-checked/annual:text-white peer-focus-visible/annual:outline-2 peer-focus-visible/annual:outline-offset-2 peer-focus-visible/annual:outline-brand-600 inline-flex min-h-11 cursor-pointer items-center rounded-full border border-line bg-surface px-4 text-sm font-semibold text-muted">
+        <%= t("landing.pricing.annual_label") %>
+        <span class="ml-1.5 text-xs font-semibold"><%= t("landing.pricing.annual_note") %></span>
+      </label>
+
+      <%# 월간 가격 카드 (기본 표시) %>
+      <div class="peer-checked/annual:hidden w-full">
+        <div class="mt-6 grid gap-4 md:grid-cols-2 md:gap-5">
+          <%= render "landing/plan_card", plan: light_plan, cycle_price: light_plan[:monthly_price],
+                cycle_note: t("landing.pricing.cycle_note_monthly") %>
+          <%= render "landing/plan_card", plan: standard_plan, cycle_price: standard_plan[:monthly_price],
+                cycle_note: t("landing.pricing.cycle_note_monthly") %>
+        </div>
+      </div>
+      <%# 연간 가격 카드 (연간 선택 시에만 표시) %>
+      <div class="hidden peer-checked/annual:block w-full">
+        <div class="mt-6 grid gap-4 md:grid-cols-2 md:gap-5">
+          <%= render "landing/plan_card", plan: light_plan, cycle_price: light_plan[:annual_price],
+                cycle_note: t("landing.pricing.cycle_note_annual") %>
+          <%= render "landing/plan_card", plan: standard_plan, cycle_price: standard_plan[:annual_price],
+                cycle_note: t("landing.pricing.cycle_note_annual") %>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-8 flex justify-center">
+      <%= link_to t("landing.pricing.cta"), "#beta", class: "btn-primary btn-lg w-full md:w-auto md:px-6",
+            data: { event: "cta_pricing" } %>
+    </div>
+    <p class="mt-4 text-center text-xs text-muted"><%= t("landing.pricing.note") %></p>
+  </div>
+</section>

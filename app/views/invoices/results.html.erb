@@ -1,47 +1,52 @@
-<div class="space-y-4">
-  <div class="flex items-center justify-between">
-    <h1 class="text-xl font-bold"><%= t("invoices.results.title", month: @month) %></h1>
-    <%= link_to t("common.back"), invoices_path(month: @month),
-          class: "min-h-11 px-3 inline-flex items-center rounded-lg border border-slate-300 bg-white text-sm" %>
-  </div>
+<%= render layout: "shared/page_header", locals: { title: t("invoices.results.title", month: @month) } do %>
+  <%= render "shared/button", label: t("common.back"), url: invoices_path(month: @month), variant: :secondary %>
+<% end %>
 
-  <div class="rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
-    <% if @logs.empty? %>
-      <p class="p-5 text-sm text-slate-500"><%= t("invoices.results.empty") %></p>
-    <% end %>
-    <% @logs.each do |log| %>
-      <div class="p-4 space-y-1">
-        <p class="font-semibold text-sm">
-          <%= log.invoice.student_name_snapshot %> ·
-          <span class="<%= message_status_badge_class(log.status) %>"><%= t("messages.status.#{log.status}") %></span>
+<%# 발송 결과 목록 — 상태는 색상+텍스트 배지로 통일 (PRD 16.2) %>
+<div class="space-y-3">
+  <% if @logs.empty? %>
+    <%= render "shared/empty_state", title: t("invoices.results.empty"),
+          cta_label: t("invoices.results.empty_cta"), cta_url: invoices_path(month: @month) %>
+  <% end %>
+  <% @logs.each do |log| %>
+    <div class="rounded-xl border border-line bg-surface p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <p class="min-w-0 text-sm font-bold text-ink">
+          <span class="truncate"><%= log.invoice.student_name_snapshot %></span>
+        </p>
+        <div class="flex shrink-0 items-center gap-1.5">
+          <% message_tone = { "QUEUED" => :neutral, "SENDING" => :neutral, "SENT" => :success,
+                              "FALLBACK_SENT" => :success, "SIMULATED" => :neutral, "FAILED" => :danger }.fetch(log.status, :neutral) %>
+          <%= render "shared/badge", tone: message_tone, text: t("messages.status.#{log.status}") %>
           <% if log.resend_of_id.present? %>
-            <span class="ml-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs"><%= t("messages.resend_badge") %></span>
+            <%= render "shared/badge", tone: :neutral, text: t("messages.resend_badge") %>
           <% end %>
-        </p>
-        <p class="text-sm text-slate-500">
-          <%= t("messages.channel.#{log.channel}") %> ·
-          <%= t("messages.template.#{log.template_type}") %> ·
-          <%= l(log.created_at, format: :short) %>
-          <% if log.sent_at.present? %> · <%= t("messages.sent_at", at: l(log.sent_at, format: :short)) %><% end %>
-        </p>
-        <% if log.FAILED? %>
-          <p class="text-sm text-red-600"><%= t("messages.error_line", code: log.error_code, message: log.error_message) %></p>
-          <%# MSG-001 예외: 원장 명시 '다시 보내기' %>
-          <%= button_to t("messages.resend"), resend_invoice_path(log.invoice, month: @month),
-                class: "mt-2 min-h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm font-semibold" %>
-        <% end %>
-        <% if log.QUEUED? %>
-          <p class="text-sm text-blue-700"><%= t("messages.queued_note") %></p>
-          <%# MSG-007: 예약 발송 취소 %>
-          <%= button_to t("messages.cancel_queue"), invoice_message_log_path(message_log_id: log.id),
-                method: :delete,
-                data: { turbo_confirm: t("messages.cancel_queue_confirm") },
-                class: "mt-2 min-h-11 px-3 rounded-lg border border-red-200 text-red-600 bg-white text-sm font-semibold" %>
-        <% end %>
-        <% if log.SIMULATED? %>
-          <p class="text-xs text-violet-600"><%= t("messages.simulated_note") %></p>
-        <% end %>
+        </div>
       </div>
-    <% end %>
-  </div>
+      <p class="mt-1.5 text-sm leading-relaxed text-muted">
+        <%= t("messages.channel.#{log.channel}") %> ·
+        <%= t("messages.template.#{log.template_type}") %> ·
+        <span class="tabular-nums"><%= l(log.created_at, format: :short) %></span>
+        <% if log.sent_at.present? %> · <%= t("messages.sent_at", at: l(log.sent_at, format: :short)) %><% end %>
+      </p>
+      <% if log.FAILED? %>
+        <%# MSG-001 예외: 원장 명시 '다시 보내기' — 실패 원인·해결 방법 표시 (PRD 16.2) %>
+        <p class="mt-2 text-sm leading-relaxed text-danger-700"><%= t("messages.error_line", code: log.error_code, message: log.error_message) %></p>
+        <%= render "shared/button", label: t("messages.resend"),
+              url: resend_invoice_path(log.invoice, month: @month), method: :post,
+              variant: :secondary, class: "mt-2" %>
+      <% end %>
+      <% if log.QUEUED? %>
+        <p class="mt-2 text-sm text-info-700"><%= t("messages.queued_note") %></p>
+        <%# MSG-007: 예약 발송 취소 — 되돌릴 수 없는 작업 확인 단계 (PRD 15.4) %>
+        <%= render "shared/button", label: t("messages.cancel_queue"),
+              url: invoice_message_log_path(message_log_id: log.id), method: :delete,
+              data: { turbo_confirm: t("messages.cancel_queue_confirm") },
+              variant: :destructive_secondary, class: "mt-2" %>
+      <% end %>
+      <% if log.SIMULATED? %>
+        <p class="mt-2 text-xs leading-relaxed text-muted"><%= t("messages.simulated_note") %></p>
+      <% end %>
+    </div>
+  <% end %>
 </div>
