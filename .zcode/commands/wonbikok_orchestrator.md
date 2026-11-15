@@ -8,7 +8,7 @@ skills: wonbikok-orchestrator
 
 하드 룰:
 
-- 사용자 승인 전 `wonbikok-developer` / `wonbikok-reviewer` / `wonbikok-tester` 서브에이전트를 호출하지 않는다. 플랜 요약 보고 후 턴을 종료하고 승인을 기다린다.
+- 사용자 승인 전 `wonbikok-developer` / `wonbikok-reviewer` / `wonbikok-tester` 서브에이전트를 호출하지 않는다. 플랜 요약 보고 후 `AskUserQuestion` 선택 질의(승인 — 계속 진행/수정 요청/중단)로 승인을 받는다(HARNESS_CONVENTION §6.13). 승인 선택 시 같은 턴에서 진행하며, 질의 취소·미지원 환경은 텍스트 폴백으로 턴을 종료하고 승인을 기다린다.
 - 오케스트레이터는 직접 코드를 수정하지 않고 구현·리뷰·테스트를 서브에이전트에 위임한다.
 - 진행 상태는 `.zcode/progress.json`, Phase 산출물은 `_workspace/`에 기록한다.
 

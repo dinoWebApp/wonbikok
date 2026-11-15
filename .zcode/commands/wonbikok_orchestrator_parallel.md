@@ -8,7 +8,7 @@ skills: wonbikok-orchestrator
 
 하드 룰:
 
-- 사용자 승인 전 `wonbikok-developer` / `wonbikok-reviewer` / `wonbikok-tester` 서브에이전트를 호출하지 않는다. 병렬 배치 플랜(태스크 분해·파일 소유권 표·병렬/통합 분류·동시성 상한)을 보고 후 턴을 종료하고 승인을 기다린다.
+- 사용자 승인 전 `wonbikok-developer` / `wonbikok-reviewer` / `wonbikok-tester` 서브에이전트를 호출하지 않는다. 병렬 배치 플랜(태스크 분해·파일 소유권 표·병렬/통합 분류·동시성 상한)을 보고 후 `AskUserQuestion` 질의(병렬 실행 태스크 multiSelect 확정 + 승인)로 승인을 받는다(HARNESS_CONVENTION §6.13·§6.14). 승인 선택 시 같은 턴에서 진행하며, 질의 취소·미지원 환경은 텍스트 폴백으로 턴을 종료하고 승인을 기다린다.
 - 병렬 fan-out은 구현(Phase 3-P)과 테스트 작성(Phase 7-P)만. 문서 현행화(Phase 2)·통합(Phase 3-S)·게이트(Phase 4/7-S)·리뷰는 직렬 배치로 처리한다.
 - 각 병렬 Developer 위임에는 소유권 화이트리스트(자기 태스크 대상 파일만)·자체 검증 스코프 제한(자기 파일 단위)·repo-wide 명령 금지(전체 테스트·마이그레이션 생성은 통합 단계에서만)를 포함한다.
 - `.zcode/progress.json`은 오케스트레이터만 기입한다. 태스크별 산출물은 `_workspace/parallel/<task-id>/`에 분리 기록한다.
