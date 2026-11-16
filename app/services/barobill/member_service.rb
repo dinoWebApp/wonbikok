@@ -31,13 +31,19 @@ module Barobill
         [ :CorpNum, tenant.business_number.to_s ],
         [ :CorpName, tenant.name.to_s ],
         [ :CEOName, tenant.owner_name.to_s ],
-        [ :Addr, tenant.address.to_s ],
         [ :BizType, tenant.biz_type.to_s ],
-        [ :BizCategory, tenant.business_type.to_s ],
-        [ :TEL, tenant.biz_tel.to_s ],
-        [ :Email, tenant.email.to_s ],
+        [ :BizClass, tenant.business_type.to_s ],
+        [ :PostNum, "" ],
+        [ :Addr1, tenant.address.to_s ],
+        [ :Addr2, "" ],
+        [ :MemberName, tenant.owner_name.to_s ],
+        [ :JuminNum, "" ],
         [ :ID, member_id ],
-        [ :PWD, pwd.to_s ]
+        [ :PWD, pwd.to_s ],
+        [ :Grade, "" ],
+        [ :TEL, tenant.biz_tel.to_s ],
+        [ :HP, "" ],
+        [ :Email, tenant.email.to_s ]
       ]
 
       result = call("RegistCorp", fields)

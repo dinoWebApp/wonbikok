@@ -47,12 +47,13 @@ class CashReceipt::IssueJob < ApplicationJob
     tenant = receipt.tenant
     {
       FranchiseCorpNum: tenant.business_number,
-      MemberID: tenant.barobill_member_id,
-      CorpName: tenant.name,
-      CEOName: tenant.owner_name,
-      Addr: tenant.address,
-      Tel: tenant.biz_tel,
+      FranchiseMemberID: tenant.barobill_member_id,
+      FranchiseCorpName: tenant.name,
+      FranchiseCEOName: tenant.owner_name,
+      FranchiseAddr: tenant.address,
+      FranchiseTel: tenant.biz_tel,
       IdentityNum: receipt.identity_num,
+      TradeDate: Time.current.strftime("%Y%m%d%H%M%S"), # 발행 시점 — D-1 이내 항상 만족
       TradeType: "N",
       TradeUsage: receipt.expense_evidence? ? "2" : "1", # 1=소득공제 / 2=지출증빙
       TradeMethod: Barobill::CashReceiptService::TRADE_METHOD_MOBILE,

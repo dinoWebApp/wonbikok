@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "net/http"
+require "uri"
+
 module Barobill
   # 바로빌 API 오류 — 음수 오류코드·메시지 보관(어댑터 계약: 실패는 예외 대신 Result.failure)
   class Error < StandardError
@@ -26,8 +29,8 @@ module Barobill
   # ※ 공식 문서 페이지가 JS 렌더로 기계 열람이 불완전하여 메서드별 정확 파라미터 순서·
   #   복합형(CashBillEx) 자식 태그 규격은 스파이크(테스트키 1회)로 검증할 항목 — 03_implementation.md 참조.
   class BaseService
-    API_HOST = "https://ws.baroservice.com"
-    TEST_API_HOST = "https://testws.baroservice.com"
+    API_HOST = "https://ws.baroservice.com/CASHBILL.asmx"
+    TEST_API_HOST = "https://testws.baroservice.com/CASHBILL.asmx"
     XML_NS = "http://ws.baroservice.com/"
     OPEN_TIMEOUT = 5
     READ_TIMEOUT = 20
@@ -126,7 +129,7 @@ module Barobill
     end
 
     def post_xml(method_name, body)
-      uri = URI("#{api_host}/CASHRECEIPT.SVC")
+      uri = URI(api_host)
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
       http.open_timeout = OPEN_TIMEOUT
