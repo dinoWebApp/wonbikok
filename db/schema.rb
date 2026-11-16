@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_04_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
   create_table "beta_applications", force: :cascade do |t|
     t.string "name", null: false
     t.string "title", null: false
@@ -27,6 +27,36 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_000001) do
     t.index ["contact_type", "contact_value"], name: "index_beta_applications_on_contact_type_and_contact_value", unique: true
   end
 
+  create_table "cash_receipts", force: :cascade do |t|
+    t.integer "tenant_id", null: false
+    t.integer "invoice_id", null: false
+    t.integer "payment_id"
+    t.string "mgt_key", limit: 24, null: false
+    t.string "cancel_mgt_key"
+    t.string "issue_type", default: "income_deduction", null: false
+    t.string "state", default: "pending", null: false
+    t.integer "barobill_state"
+    t.string "nts_confirm_num", limit: 9
+    t.string "nts_confirm_message"
+    t.string "identity_num"
+    t.datetime "trade_date"
+    t.integer "amount", default: 0, null: false
+    t.integer "tax", default: 0, null: false
+    t.integer "service_charge", default: 0, null: false
+    t.string "item_name"
+    t.datetime "issued_at"
+    t.datetime "cancelled_at"
+    t.text "cancel_reason"
+    t.integer "retry_count", default: 0, null: false
+    t.string "last_error"
+    t.string "issued_by"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["invoice_id"], name: "index_cash_receipts_on_invoice_id"
+    t.index ["mgt_key"], name: "index_cash_receipts_on_mgt_key", unique: true
+    t.index ["tenant_id", "state"], name: "index_cash_receipts_on_tenant_id_and_state"
+  end
+
   create_table "guardians", force: :cascade do |t|
     t.integer "student_id", null: false
     t.string "name", null: false
@@ -35,6 +65,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_000001) do
     t.boolean "is_primary", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "business_number"
     t.index ["phone_last4"], name: "index_guardians_on_phone_last4"
     t.index ["student_id"], name: "index_guardians_on_student_id"
   end
@@ -257,6 +288,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_000001) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "excluded_from_reminders", default: false, null: false
+    t.string "cash_receipt_issue_type", default: "income_deduction", null: false
     t.index ["tenant_id", "status"], name: "index_students_on_tenant_id_and_status"
     t.index ["tenant_id"], name: "index_students_on_tenant_id"
   end
@@ -283,6 +315,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_000001) do
     t.text "remind_custom_text_d3"
     t.text "remind_custom_text_d7"
     t.text "remind_custom_text_month_end"
+    t.string "biz_tel"
+    t.string "biz_type"
+    t.string "email"
+    t.string "barobill_member_id"
+    t.datetime "barobill_joined_at"
   end
 
   create_table "users", force: :cascade do |t|
@@ -297,6 +334,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_000001) do
     t.index ["tenant_id"], name: "index_users_on_tenant_id"
   end
 
+  add_foreign_key "cash_receipts", "invoices"
+  add_foreign_key "cash_receipts", "tenants"
   add_foreign_key "guardians", "students"
   add_foreign_key "invoices", "students"
   add_foreign_key "invoices", "tenants"

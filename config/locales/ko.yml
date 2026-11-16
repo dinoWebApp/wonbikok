@@ -78,6 +78,11 @@ ko:
       business_type: "업종"
       owner_name: "대표자명"
       address: "사업장 주소"
+      biz_tel: "사업장 전화번호"
+      biz_type: "업태 (예: 교육)"
+      biz_type_hint: "현금영수증 발급대행(바로빌) 가입에 사용됩니다."
+      email: "대표자 이메일"
+      email_hint: "현금영수증 발급대행(바로빌) 가입에 사용됩니다."
     bank:
       title: "납부 계좌 등록"
       description: "이 계좌 정보는 납부 안내 알림톡과 청구 링크에 자동 표기됩니다."
@@ -198,6 +203,7 @@ ko:
       student: 원생
       guardian: 보호자
       beta_application: "베타 신청"
+      cash_receipt: "현금영수증"
     attributes:
       student:
         name: 원생명
@@ -215,8 +221,18 @@ ko:
       guardian:
         name: 보호자명
         phone_number: 보호자 휴대폰번호
+      cash_receipt:
+        mgt_key: "거래 관리번호"
+        identity_num: "수취인 식별번호"
+        trade_date: "거래 일자"
+        amount: 금액
+        cancel_reason: "취소 사유"
+        state: 상태
       tenant:
         name: 상호
+        biz_tel: "사업장 전화번호"
+        biz_type: 업태
+        email: "대표자 이메일"
         business_number: 사업자등록번호
         business_type: 업종
         owner_name: 대표자명
@@ -260,6 +276,9 @@ ko:
         invalid_month: "형식이 올바르지 않습니다(YYYY-MM)."
         duplicate_dispatch: "이미 발송된 이력이 있습니다. '다시 보내기'를 사용해 주세요."
         night_send_forbidden: "발송 시각은 오전 9시~오후 5시 사이여야 합니다(야간 발송 금지)."
+        record_invalid: "검증에 실패했습니다: %{errors}"
+        resident_number_forbidden: "주민등록번호는 수집하지 않습니다. 소득공제용은 휴대폰번호, 지급증명용은 사업자등록번호를 입력해 주세요."
+        trade_date_too_old: "거래 일자는 어제 이후만 가능합니다(전월 소급 발행 불가)."
   enums:
     tenant:
       business_type:
@@ -460,6 +479,8 @@ ko:
       reminder_d3: "리마인더(D+3)"
       reminder_d7: "리마인더(D+7)"
       reminder_month_end: "리마인더(월말)"
+      cash_receipt_issued: "현금영수증 발행 안내"
+      cash_receipt_failed: "현금영수증 발행 실패"
     status:
       QUEUED: 대기
       SENDING: "발송 중"
@@ -694,3 +715,72 @@ ko:
       terms_agreed: "베타 신청 처리와 안내를 위해 입력한 이름·호칭·연락처·신청 내용을 수집·이용하는 것에 동의합니다."
       marketing_agreed: "새소식·파일럿 안내 등 마케팅 정보 수신에 동의합니다. (선택 — 동의하지 않아도 신청할 수 있습니다)"
       privacy_note: "연락처는 암호화하여 저장하며, 그 외 부가 정보(IP·접속 기록 등)는 따로 저장하지 않습니다."
+  # ------------------------------------------------------------------
+  # 현금영수증 발행 (W3 F5 — 바로빌 발급대행, PRD 10.2)
+  # ------------------------------------------------------------------
+  cash_receipts:
+    title: "현금영수증"
+    won: 원
+    simulated_note: "연습 모드 또는 연동 키 미설정 — 실제 발송 없이 기록되었습니다."
+    index:
+      subtitle: "월별 현금영수증 발행 이력입니다. 청구 건을 선택해 수동 발행할 수 있습니다(자동 발행은 입금 확인 시 동작)."
+      month_filter: "발행 월"
+      filter: 조회
+      issuable_title: "발행 가능한 청구"
+      issue_button: 발행
+      empty: "이 달의 발행 이력이 없습니다."
+      empty_description: "발행 가능한 청구가 있으면 위에서 바로 발행할 수 있습니다."
+      empty_cta: "청구 관리로 이동"
+      confirm_num: 승인번호
+    show:
+      title: "%{student} 현금영수증"
+      state: 상태
+      issue_type: "발급 유형"
+      amount: 금액
+      tax_charge: "부가세 / 봉사료"
+      identity_num: "수취인 식별번호"
+      no_identity: "정보 미비"
+      confirm_num: "국세청 승인번호"
+      issued_by: 처리자
+      issued_at: "발행 일시"
+      cancelled_at: "취소 일시"
+      cancel_reason: "취소 사유"
+      last_error: "실패 사유"
+      retry_button: "다시 시도하기"
+      retry_confirm: "수취인 정보 보완 또는 발행 실패 건을 다시 시도할까요? 재시도 전 기존 발행 결과를 먼저 확인합니다."
+      cancel_button: "발행 취소"
+      legal_note: "취소·재발행 결과는 국세청 처리 기준에 따르며, 법적 판단을 서비스가 대행하지 않습니다."
+    cancel:
+      title: "%{student} 발행 취소"
+      subtitle: "발행된 현금영수증을 취소 요청합니다."
+      notice: "취소는 국세청 처리 기준에 따라 시간이 걸릴 수 있으며, 처리 결과는 상태로 표시됩니다."
+      reason_label: "취소 사유"
+      reason_placeholder: "예: 오발행, 금액 정정 등"
+      submit: "취소 요청하기"
+      confirm: "현금영수증 취소를 요청할까요? 취소 건도 바로빌 과금 대상입니다."
+      errors:
+        reason_blank: "취소 사유를 입력해 주세요."
+        not_cancellable: "취소할 수 없는 상태입니다."
+    issue_type:
+      income_deduction: "소득공제용"
+      expense_evidence: "지급증명용"
+    state:
+      needs_info: "정보 필요"
+      pending: "발행 대기"
+      processing: "확인 중"
+      issued: "발행 완료"
+      failed: "발행 실패"
+      cancel_pending: "취소 요청 중"
+      cancelled: "취소 완료"
+    notices:
+      issue_enqueued: "현금영수증 발행을 요청했습니다. 최종 승인 확인 후 상태가 갱신됩니다."
+      duplicate: "이미 발행된 청구입니다. 기존 발행 이력을 표시합니다."
+      needs_info: "수취인 식별번호가 미비해 발행 대기 상태로 저장되었습니다. 보호자 정보를 확인해 주세요."
+      not_issuable: "발행할 수 없는 청구입니다."
+      invoice_not_found: "청구를 찾을 수 없습니다."
+      retry_enqueued: "재발행을 요청했습니다."
+      retry_not_allowed: "발행 실패 상태에서만 재발행할 수 있습니다."
+      cancel_requested: "취소를 요청했습니다. 국세청 처리 완료 후 상태가 갱신됩니다."
+  barobill:
+    errors:
+      default: "바로빌 오류(코드 %{code}) — 잠시 후 다시 시도하거나 오류 상세를 확인해 주세요."

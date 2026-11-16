@@ -50,6 +50,7 @@ class OnboardingController < ApplicationController
     end
 
     if @tenant.save
+      register_barobill_member # F5: 실패해도 온보딩 진행은 차단하지 않는다(재시도 가능)
       advance_step(2)
     else
       flash.now[:alert] = t("errors.form")
@@ -93,10 +94,28 @@ class OnboardingController < ApplicationController
   end
 
   def business_params
-    params.expect(tenant: [ :name, :business_number, :business_type, :owner_name, :address ])
+    params.expect(tenant: [ :name, :business_number, :business_type, :owner_name, :address,
+                            :biz_tel, :biz_type, :email ])
   end
 
   def bank_params
     params.expect(tenant: [ :bank_name, :bank_account, :account_holder ])
+  end
+
+  # F5 바로빌 회원사 자동 가입(PRD 10.2 — RegistCorp). 성공 시 barobill_member_id·joined_at 저장,
+  # 실패 시에도 온보딩은 계속(barobill_member_id 미저장 — 사업자 정보 재저장으로 재시도 가능).
+  def register_barobill_member
+    service = Barobill::MemberService.from_credentials
+    member_id = "wonbi#{@tenant.id}"
+    result = service.regist_corp(tenant: @tenant, id: member_id, pwd: SecureRandom.hex(8))
+
+    if result.success?
+      @tenant.update!(barobill_member_id: result.value, barobill_joined_at: Time.current,
+                      cash_receipt_link_status: :linked)
+    else
+      @tenant.update!(cash_receipt_link_status: :failed)
+    end
+  rescue Barobill::Error, ActiveRecord::RecordInvalid
+    @tenant.update!(cash_receipt_link_status: :failed) # 연동 실패 기록 — 온보딩 진행 차단 없음
   end
 end

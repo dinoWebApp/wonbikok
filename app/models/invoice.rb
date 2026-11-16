@@ -2,13 +2,16 @@
 # 확정 시점 스냅샷 보유(TEN-004) — 원생 설정 변경이 과거 청구를 바꾸지 않는다.
 # [student_id, target_month] 유니크 제약으로 INV-001 강제.
 class Invoice < ApplicationRecord
-  # PRD 9.1 — PARTIALLY_PAID·PAID는 W3 수납(PAY) 도입 시 활성화
+  # PRD 9.1 — PARTIALLY_PAID·PAID: 수납(PAY) 상태. F4 연계 전이라도 CR-002 auto 게이트(C3)에서
+  # 참조하므로 enum 키만 선활성화(전이 로직은 F4 착수 시 추가)
   enum :status, {
     DRAFT: "DRAFT",       # 초안: 자동 생성·미확정, 금액 수정 자유
     READY: "READY",       # 발송 대기: 확정 완료, 발송 전
     SENT: "SENT",         # 발송 완료
     UNPAID: "UNPAID",     # 미납(기한 도래 전 미수납)
     OVERDUE: "OVERDUE",   # 기한 초과(리마인더 대상)
+    PAID: "PAID",                 # 수납 완료(입금 확인)
+    PARTIALLY_PAID: "PARTIALLY_PAID", # 부분 수납
     CANCELLED: "CANCELLED" # 취소(수납 합계 제외 — INV-003)
   }, validate: true
 
@@ -105,6 +108,16 @@ class Invoice < ApplicationRecord
     return false unless READY? || SENT?
 
     update!(status: :SENT, sent_at: Time.current)
+  end
+
+  # F5 현금영수증 발행 가능 상태(CR-002: 트리거 유효성 검사 — C3 경로별 정책 분리).
+  # - auto(입금 확인 트리거 — F4 Payments::ConfirmService): 수납 확인 완료(PAID·PARTIALLY_PAID)만 허용
+  # - manual(원장 수동 발행): 취소 청구(CANCELLED)만 차단(INV-003)
+  def cash_receipt_issuable?(origin: :manual)
+    return false if CANCELLED?
+    return [ :PAID, :PARTIALLY_PAID ].include?(status.to_sym) if origin == :auto
+
+    true
   end
 
   def change_history_entries

@@ -1,0 +1,24 @@
+<%= render "shared/page_header", title: t("cash_receipts.cancel.title", student: @cash_receipt.invoice.student_name_snapshot),
+      description: t("cash_receipts.cancel.subtitle") %>
+
+<%= form_with url: cancel_cash_receipt_path(@cash_receipt), method: :post, class: "space-y-5" do %>
+  <%= render layout: "shared/card", locals: { class: "p-5 space-y-4" } do %>
+    <div class="rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm text-warning-700">
+      <p><%= t("cash_receipts.cancel.notice") %></p>
+    </div>
+    <div>
+      <label for="cancel_reason" class="mb-1.5 flex items-baseline justify-between gap-2">
+        <span class="text-sm font-semibold text-ink"><%= t("cash_receipts.cancel.reason_label") %></span>
+        <span class="text-xs font-semibold text-danger-600">(<%= t("common.required") %>)</span>
+      </label>
+      <%= text_area_tag :cancel_reason, params[:cancel_reason], rows: 4, required: true,
+            class: "field-input", placeholder: t("cash_receipts.cancel.reason_placeholder") %>
+      <% if flash[:alert].present? %>
+        <p class="mt-1 text-sm font-medium text-danger-700"><%= flash[:alert] %></p>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%= submit_tag t("cash_receipts.cancel.submit"), class: "btn-primary btn-lg w-full",
+        data: { turbo_confirm: t("cash_receipts.cancel.confirm") } %>
+<% end %>

@@ -31,6 +31,21 @@
           label_text: t("onboarding.business.address") } do %>
       <%= form.text_field :address, class: "field-input" %>
     <% end %>
+    <%# F5 바로빌 RegistCorp 필수 수집(PRD 10.2) — 사업장 전화·업태·이메일 %>
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :biz_tel,
+          label_text: t("onboarding.business.biz_tel"), required: true } do %>
+      <%= form.text_field :biz_tel, inputmode: "tel", placeholder: "02-1234-5678", class: "field-input" %>
+    <% end %>
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :biz_type,
+          label_text: t("onboarding.business.biz_type"), required: true,
+          hint: t("onboarding.business.biz_type_hint") } do %>
+      <%= form.text_field :biz_type, placeholder: "교육", class: "field-input" %>
+    <% end %>
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :email,
+          label_text: t("onboarding.business.email"), required: true,
+          hint: t("onboarding.business.email_hint") } do %>
+      <%= form.email_field :email, placeholder: "example@email.com", class: "field-input" %>
+    <% end %>
   <% end %>
 
   <%= form.submit t("common.next"), class: "btn-primary btn-lg w-full" %>

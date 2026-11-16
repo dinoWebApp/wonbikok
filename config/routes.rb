@@ -60,6 +60,18 @@ Rails.application.routes.draw do
   patch "reminders/students/:student_id/remind_exclusion", to: "reminders#toggle_exclusion",
         as: :reminder_student_exclusion # 원생별 제외/해제 (MSG-004)
 
+  # 현금영수증 발행 (W3 F5 — 바로빌 발급대행)
+  resources :cash_receipts, only: %i[index show] do
+    collection do
+      post :issue # 수동 발행(invoice_id 지정 — CR-002 트리거 인터페이스 경유, 청구 건 신규 발행이므로 collection)
+    end
+    member do
+      post :retry  # 수동 재발행(failed 상태만 — CR-004 상태 재조회 포함)
+      get :cancel, action: :cancel_form # 취소 사유 폼
+      post :cancel                      # 발행 취소(issued 상태만, 사유 필수 — CR-005)
+    end
+  end
+
   # 대시보드 (인증 후 앱 홈 — 루트가 랜딩으로 바뀌면서 이동, 2026-11-04)
   get "/dashboard", to: "dashboard#show", as: :dashboard
 end

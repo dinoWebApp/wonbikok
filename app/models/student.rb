@@ -12,6 +12,11 @@ class Student < ApplicationRecord
 
   enum :status, { active: "active", paused: "paused", withdrawn: "withdrawn" }, prefix: true
   enum :payment_type, { bank_transfer: "계좌이체", cash: "현금" }, prefix: true
+  # F5 현금영수증 발급 유형(원생별 선택 — 소득공제용/지급증명용)
+  enum :cash_receipt_issue_type, {
+    income_deduction: "income_deduction",
+    expense_evidence: "expense_evidence"
+  }, validate: true
 
   validates :name, presence: true
   validates :monthly_fee, numericality: { greater_than_or_equal_to: 0 }

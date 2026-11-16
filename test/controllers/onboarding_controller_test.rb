@@ -71,11 +71,48 @@ class OnboardingControllerTest < ActionDispatch::IntegrationTest
     log_in(user)
 
     patch onboarding_step_path(2), params: {
-      tenant: { name: "테스트 학원", business_number: "123-45-67890", business_type: "교습소", owner_name: "김원장" }
+      tenant: { name: "테스트 학원", business_number: "123-45-67890", business_type: "교습소", owner_name: "김원장",
+                biz_tel: "02-1234-5678", biz_type: "교육", email: "owner@example.com" }
     }
 
     assert_redirected_to onboarding_step_path(3)
     assert_equal "1234567890", Tenant.find_by(name: "테스트 학원").reload.business_number
+  end
+
+  # F5 바로빌 회원사 자동 가입 — 성공 시 barobill_member_id 저장(SIMULATED: test 환경 cert_key 공백)
+  test "F5 사업자 정보 제출 시 바로빌 가입이 시도되고 member_id가 저장된다" do
+    _tenant, user = create_owner_user(step: 2)
+    log_in(user)
+
+    patch onboarding_step_path(2), params: {
+      tenant: { name: "테스트 학원", business_number: "123-45-67890", business_type: "교습소", owner_name: "김원장",
+                biz_tel: "02-1234-5678", biz_type: "교육", email: "owner@example.com" }
+    }
+
+    tenant = Tenant.find_by(name: "테스트 학원")
+    assert_redirected_to onboarding_step_path(3)
+    assert_equal "wonbi#{tenant.id}", tenant.reload.barobill_member_id
+    assert tenant.barobill_joined_at.present?
+    assert tenant.cash_receipt_linked?
+  end
+
+  # F5 — RegistCorp 실패(어댑터 오류) 시에도 온보딩은 계속된다(재시도 가능)
+  test "F5 바로빌 가입 실패 시에도 온보딩은 차단되지 않는다" do
+    _tenant, user = create_owner_user(step: 2)
+    log_in(user)
+    Barobill::MemberService.define_singleton_method(:from_credentials) { raise Barobill::Error.new("NETWORK_ERROR", code: :network_error) }
+
+    patch onboarding_step_path(2), params: {
+      tenant: { name: "테스트 학원", business_number: "123-45-67890", business_type: "교습소", owner_name: "김원장",
+                biz_tel: "02-1234-5678", biz_type: "교육", email: "owner@example.com" }
+    }
+
+    tenant = Tenant.find_by(name: "테스트 학원")
+    assert_redirected_to onboarding_step_path(3)
+    assert_nil tenant.reload.barobill_member_id
+    assert tenant.cash_receipt_failed?
+  ensure
+    Barobill::MemberService.singleton_class.remove_method(:from_credentials)
   end
 
   # 5스텝: 연습 모드 선택 → 온보딩 완료 → 대시보드(연습 샘플 데이터, 외부 호출 없음)

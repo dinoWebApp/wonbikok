@@ -1,0 +1,58 @@
+<%= render layout: "shared/page_header", locals: { title: t("cash_receipts.title"),
+      description: t("cash_receipts.index.subtitle") } do %>
+  <%# 월 필터 — 기본 당월 %>
+  <%= form_with url: cash_receipts_path, method: :get, class: "flex items-center gap-2" do %>
+    <%= month_field_tag :month, @month, class: "field-input px-3", "aria-label": t("cash_receipts.index.month_filter") %>
+    <%= submit_tag t("cash_receipts.index.filter"), class: "btn-secondary shrink-0 px-3 text-xs" %>
+  <% end %>
+<% end %>
+
+<% unless @issuable_invoices.empty? %>
+  <%# 수동 발행 대상 청구 — 발행 버튼(CR-002 트리거 경유) %>
+  <%= render layout: "shared/card", locals: { class: "p-4 mb-5" } do %>
+    <h2 class="mb-3 text-sm font-bold text-ink"><%= t("cash_receipts.index.issuable_title") %></h2>
+    <div class="space-y-3">
+      <% @issuable_invoices.each do |invoice| %>
+        <div class="flex items-center justify-between gap-3">
+          <span class="min-w-0 text-sm">
+            <span class="font-bold text-ink"><%= invoice.student_name_snapshot %></span>
+            <span class="ml-1 text-muted">· <%= number_with_delimiter(invoice.total_amount) %><%= t("cash_receipts.won") %></span>
+          </span>
+          <%# 위험 동작 아님(신규 발행) — 확인 단계로 중복 발행 방지(CR-001은 서버 보장) %>
+          <%= button_to t("cash_receipts.index.issue_button"), issue_cash_receipts_path(invoice_id: invoice.id),
+                method: :post, form: { class: "shrink-0" },
+                class: "btn-primary shrink-0 px-3 text-xs min-h-11" %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>
+
+<% if @cash_receipts.empty? %>
+  <%# 빈 상태 — 다음 액션 안내 필수 (PRD 15.4) %>
+  <%= render "shared/empty_state", title: t("cash_receipts.index.empty"),
+        description: t("cash_receipts.index.empty_description"),
+        cta_label: t("cash_receipts.index.empty_cta"), cta_url: invoices_path %>
+<% else %>
+  <div class="space-y-3">
+    <% @cash_receipts.each do |receipt| %>
+      <%= link_to cash_receipt_path(receipt), class: "flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface shadow-sm p-4" do %>
+        <span class="min-w-0 text-sm">
+          <span class="flex flex-wrap items-center gap-1.5">
+            <span class="font-bold text-ink"><%= receipt.invoice.student_name_snapshot %></span>
+            <% if receipt.expense_evidence? %>
+              <%= render "shared/badge", tone: :neutral, text: t("cash_receipts.issue_type.expense_evidence") %>
+            <% end %>
+          </span>
+          <span class="mt-1 block text-muted">
+            <span class="font-semibold tabular-nums text-ink"><%= number_with_delimiter(receipt.amount) %><%= t("cash_receipts.won") %></span>
+            <% if receipt.nts_confirm_num.present? %>
+              · <%= t("cash_receipts.index.confirm_num") %> <span class="tabular-nums"><%= receipt.nts_confirm_num %></span>
+            <% end %>
+          </span>
+        </span>
+        <%= render "shared/badge", tone: state_badge_tone(receipt), text: t("cash_receipts.state.#{receipt.state}") %>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

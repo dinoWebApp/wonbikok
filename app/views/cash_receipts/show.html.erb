@@ -1,0 +1,79 @@
+<%= render layout: "shared/page_header", locals: { title: t("cash_receipts.show.title", student: @invoice.student_name_snapshot) } do %>
+  <%= render "shared/button", label: t("common.back"), url: cash_receipts_path(month: @invoice.target_month), variant: :secondary, class: "px-3" %>
+<% end %>
+
+<%= render layout: "shared/card", locals: { class: "p-5 space-y-4 text-sm" } do %>
+  <div class="flex items-center justify-between">
+    <span class="font-semibold text-muted"><%= t("cash_receipts.show.state") %></span>
+    <%= render "shared/badge", tone: state_badge_tone(@cash_receipt), text: t("cash_receipts.state.#{@cash_receipt.state}") %>
+  </div>
+  <div class="flex items-center justify-between">
+    <span class="font-semibold text-muted"><%= t("cash_receipts.show.issue_type") %></span>
+    <span class="text-ink"><%= t("cash_receipts.issue_type.#{@cash_receipt.issue_type}") %></span>
+  </div>
+  <div class="flex items-center justify-between">
+    <span class="font-semibold text-muted"><%= t("cash_receipts.show.amount") %></span>
+    <span class="font-bold tabular-nums text-ink"><%= number_with_delimiter(@cash_receipt.amount) %><%= t("cash_receipts.won") %></span>
+  </div>
+  <% if @cash_receipt.tax.to_i.positive? || @cash_receipt.service_charge.to_i.positive? %>
+    <div class="flex items-center justify-between">
+      <span class="font-semibold text-muted"><%= t("cash_receipts.show.tax_charge") %></span>
+      <span class="tabular-nums text-ink"><%= number_with_delimiter(@cash_receipt.tax) %> / <%= number_with_delimiter(@cash_receipt.service_charge) %></span>
+    </div>
+  <% end %>
+  <div class="flex items-center justify-between">
+    <span class="font-semibold text-muted"><%= t("cash_receipts.show.identity_num") %></span>
+    <%# TEN-003 마스킹 표시 %>
+    <span class="tabular-nums text-ink"><%= @cash_receipt.masked_identity_num.presence || t("cash_receipts.show.no_identity") %></span>
+  </div>
+  <% if @cash_receipt.nts_confirm_num.present? %>
+    <div class="flex items-center justify-between">
+      <span class="font-semibold text-muted"><%= t("cash_receipts.show.confirm_num") %></span>
+      <span class="tabular-nums text-ink"><%= @cash_receipt.nts_confirm_num %></span>
+    </div>
+  <% end %>
+  <div class="flex items-center justify-between">
+    <span class="font-semibold text-muted"><%= t("cash_receipts.show.issued_by") %></span>
+    <span class="text-ink"><%= @cash_receipt.issued_by.presence || "-" %></span>
+  </div>
+  <% if @cash_receipt.issued_at.present? %>
+    <div class="flex items-center justify-between">
+      <span class="font-semibold text-muted"><%= t("cash_receipts.show.issued_at") %></span>
+      <span class="tabular-nums text-ink"><%= l(@cash_receipt.issued_at, format: :short) %></span>
+    </div>
+  <% end %>
+  <% if @cash_receipt.cancelled_at.present? %>
+    <div class="flex items-center justify-between">
+      <span class="font-semibold text-muted"><%= t("cash_receipts.show.cancelled_at") %></span>
+      <span class="tabular-nums text-ink"><%= l(@cash_receipt.cancelled_at, format: :short) %></span>
+    </div>
+  <% end %>
+  <% if @cash_receipt.cancel_reason.present? %>
+    <div>
+      <p class="font-semibold text-muted"><%= t("cash_receipts.show.cancel_reason") %></p>
+      <p class="mt-1 text-ink"><%= @cash_receipt.cancel_reason %></p>
+    </div>
+  <% end %>
+  <% if @cash_receipt.last_error.present? && @cash_receipt.failed? %>
+    <%# 실패 사유 — 알기 쉬운 요약(F5 명세) %>
+    <div class="rounded-xl border border-danger-200 bg-danger-50 p-3">
+      <p class="font-semibold text-danger-700"><%= t("cash_receipts.show.last_error") %></p>
+      <p class="mt-1 text-sm text-danger-700"><%= @cash_receipt.last_error %></p>
+    </div>
+  <% end %>
+<% end %>
+
+<div class="mt-5 space-y-3">
+  <% if @cash_receipt.retryable? %>
+    <%# 수동 재발행 — failed 상태 전용(CR-004 상태 재조회는 IssueJob이 수행) %>
+    <%= button_to t("cash_receipts.show.retry_button"), retry_cash_receipt_path(@cash_receipt), method: :post,
+          form: { data: { turbo_confirm: t("cash_receipts.show.retry_confirm") } },
+          class: "btn-primary w-full min-h-11" %>
+  <% end %>
+  <% if @cash_receipt.cancellable? %>
+    <%# 취소 — 사유 폼으로 이동(위험 동작: 확인 단계 포함) %>
+    <%= render "shared/button", label: t("cash_receipts.show.cancel_button"), url: cancel_cash_receipt_path(@cash_receipt), variant: :secondary, class: "w-full min-h-11 justify-center" %>
+  <% end %>
+</div>
+
+<p class="mt-4 text-xs leading-relaxed text-muted"><%= t("cash_receipts.show.legal_note") %></p>

@@ -16,6 +16,7 @@ class Tenant < ApplicationRecord
   has_many :students, dependent: :destroy
   has_many :invoices, dependent: :destroy
   has_many :message_logs, dependent: :destroy
+  has_many :cash_receipts, dependent: :destroy
 
   # 리마인더 설정(F6) — 문구 톤 3종(부드러움/표준/공식), 단계별 토글, 발송 시각
   REMINDER_TONES = %w[soft standard formal].freeze
@@ -39,6 +40,11 @@ class Tenant < ApplicationRecord
   # 온보딩 2스텝(사업자 정보)·3스텝(납부 계좌) 서버측 완결성(W1 후속) — 가입(1스텝)에는 적용되지 않음
   validates :name, :business_number, :business_type, :owner_name, presence: true, on: :business_info
   validates :bank_name, :bank_account, :account_holder, presence: true, on: :bank_info
+
+  # 바로빌 RegistCorp 필수 수집(PRD 10.2) — W3 F5: 사업장 전화·업태·이메일
+  validates :biz_tel, :biz_type, presence: true, on: :business_info
+  validates :email, presence: true, format: { with: URI::MailTo::EMAIL_REGEXP, message: :invalid_email },
+                    on: :business_info
 
   before_validation :normalize_business_number
 

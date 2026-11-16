@@ -13,11 +13,14 @@ class MessageLog < ApplicationRecord
   enum :channel, { alimtalk: "alimtalk", sms: "sms" }, validate: true
 
   # F6 리마인더: 단계별 template_type — MSG-001 유일성(청구 × 템플릿 유형)이 단계당 1회를 강제
+  # F5 현금영수증 알림(W3 추가): 발행 안내(학부모)·발행 실패(원장) — 알림톡 심사 전 SIMULATED 기록
   enum :template_type, {
     invoice_notice: "invoice_notice",
     reminder_d3: "reminder_d3",
     reminder_d7: "reminder_d7",
-    reminder_month_end: "reminder_month_end"
+    reminder_month_end: "reminder_month_end",
+    cash_receipt_issued: "cash_receipt_issued",
+    cash_receipt_failed: "cash_receipt_failed"
   }, validate: true
 
   REMINDER_TEMPLATE_TYPES = %i[reminder_d3 reminder_d7 reminder_month_end].freeze

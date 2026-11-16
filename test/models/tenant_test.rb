@@ -12,8 +12,10 @@ class TenantTest < ActiveSupport::TestCase
   end
 
   test "사업자 정보가 완비되면 business_info 컨텍스트가 유효하다" do
+    # W3 F5: 바로빌 RegistCorp 필수 수집(사업장 전화·업태·이메일) 포함
     tenant = Tenant.new(name: "완비 학원", business_number: "1234567890",
-                        business_type: :academy, owner_name: "김원장")
+                        business_type: :academy, owner_name: "김원장",
+                        biz_tel: "02-1234-5678", biz_type: "교육", email: "owner@example.com")
 
     assert tenant.valid?(:business_info)
   end
