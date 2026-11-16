@@ -19,7 +19,7 @@ description: 원비콕 개발 오케스트레이터. 신규 기능 구현, 코�
 4. **작업 단위 위임**: 매 Phase 위임은 Agent 도구로 새 서브에이전트를 호출한다. 위임 프롬프트에 관련 파일 경로·PRD 섹션·Rule ID·읽을 `_workspace/` 산출물 경로·완료 기준을 명시한다. 이전 위임의 대화 맥락이 자동 전달된다고 가정하지 않는다.
 5. **경로 불변**: `.zcode/progress.json`, `_workspace/` 위치 변경 금지.
 6. **Rule ID 필수**: 비즈니스 로직 구현·리뷰·테스트 지시에는 PRD.md 22장의 Rule ID를 반드시 포함·인용한다.
-7. **품질 게이트**: 커밋 전 `bin/rubocop`(0 에러) + `bin/brakeman`(0 경고) + `bin/rails test`(통과). 테스트에서 포트원·솔라피 실호출 금지.
+7. **품질 게이트**: 커밋 전 `bin/rubocop`(0 에러) + `bin/brakeman`(0 경고) + `bin/rails test`(통과). 테스트에서 포트원·바로빌·솔라피 실호출 금지.
 8. **상태 기록**: 서브에이전트 결과 수신 직후 첫 도구 호출로 `.zcode/progress.json`과 세션 todo를 세트 갱신한다(다음 스폰·검증보다 먼저).
 9. **위임 실측**: Phase 3·5·7에서 서브에이전트 스폰 직후 모델 I/O 로그로 스폰된 프로필·모델·추론 수준(effort)이 정의와 일치하는지 실측해 `_workspace/00_delegation_log.md`에 한 줄 기록한다. model-io 로그는 임시 파일이므로 **스폰 직후 측정이 필수**다:
    ```bash

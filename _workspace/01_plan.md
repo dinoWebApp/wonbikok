@@ -1,118 +1,126 @@
-# 01_plan.md — 전체 퍼블리싱 재구성 (uibowl 레퍼런스 2차)
+# 01_plan.md — F5 현금영수증 발행 (바로빌 연동)
 
-- 작성일: 2026-11-04
-- 모드: 절약 (`/wonbikok_orchestrator_lite`) — lite 프로필 위임
-- 파이프라인: Full (0→1→✋→2→3→4→5→6?→7→8→9), 직렬 단일 작업 (병렬 배치 부적합 —
-  `tailwind.config.js`·`application.css` 공통 클래스·`shared/` 파셜이 전 영역 공유 파일이므로)
+- 작성일: 2026-11-16
+- 모드: 절약 (`/wonbikok_orchestrator_lite` 경유 — 현재 세션 메인 GLM-5.3-Flash, lite 프로필 위임)
+- 파이프라인: Full (0→1→✋→2→3→4→5→6?→7→8→9), 직렬 단일 Developer 위임
+- 사전 확정 결정: 발급대행 = **바로빌**(계약 체결 완료, 건당 10원, 취소·재시도 과금 가정),
+  어댑터 인증키는 credentials `barobill.test_auth_key`(테스트) / `release_auth_key`(운영) 사용
 
 ## 1. 요구사항
 
-사용자: "현재 전체 퍼블리싱이 마음에 들지 않습니다. uibowl mcp를 사용하여 전체 퍼블리싱을 재구성해주세요."
+PRD 7장 F5(현금영수증 발행) 전체. 원장이 입금 확인 시(또는 수동으로) 홈택스 접속·공동인증서 없이
+현금영수증이 발행되고 학부모에게 안내가 전송되는 것이 핵심 가치.
 
-- 직전 작업(2026-11-04 완료, `_workspace_prev/_workspace/`)에서 적용한 "토스풍 화이트+청색
-  미니멀" 스타일이 마음에 들지 않다는 것. 동일한 절제 원칙의 마이너 보정이 아니라
-  **비주얼 방향의 전면 교체**가 요구 사항.
-- 재구성 범위: "전체" — 랜딩페이지 10섹션 + 원장 앱 전체(대시보드·원생·청구·리마인더·
-  온보딩·로그인·가입) + 공통 레이아웃·공통 컴포넌트.
-- 승인 게이트에서 방향 확정 전환 허용: 아래 기본안(웜 오렌지)에 대한 사용자 변경 요청이
-  있으면 토큰표만 교체하여 동일 파이프라인 진행.
+- **바로빌 연동 전환**: 기존 설계의 포트원 경로(10.1)를 바로빌 발급대행 API로 교체
+  (memory `cash-receipt-provider-decision` — 계약 체결·건당 10원 확정)
+- **F4 의존성 처리**: 자동발행 트리거인 "입금 확인"(F4/Payment)은 미구현. 이번 F5는
+  (a) Payment 확인 시점 호출용 **트리거 인터페이스**(훅 메서드)만 정의하고,
+  (b) **원장 수동 발행** 진입(청구 목록/상세의 발행·재발행 버튼)으로 즉시 사용 가능하게 함.
+  F4 본체(매칭 힌트·부분납부·오체크 취소 절차)는 후속 태스크.
+- 인증키 운영 보유 상태: credentials에 실제 운영키 등록 완료. dev/test 기본은 SIMULATED,
+  실호출(스파이크)은 테스트키+testws로 1회 한정.
 
-## 2. uibowl 레퍼런스 (2026-11-04 2차 조사, 오케스트레이터 직접 수행)
+## 2. 바로빌 API 매핑 (공식 문서 분석 확정분)
 
-### 채택 방향: 웜 오렌지 에디토리얼 (기본안)
-
-| 참고 | 화면 | 채택 포인트 |
+| 기능 | API | 핵심 파라미터/반환 |
 |---|---|---|
-| 클래스101 (교육&도서, MAU 58만) | 검색·마이페이지·주문내역 | 화이트 바탕 + 웜 오렌지 주색(로고 컬러 계열), 블랙 강조 배너 + 오렌지 CTA, 텍스트 링크 오렌지. 교육 서비스 특유의 친근하고 따뜻한 톤 |
-| 뱅크샐러드 (금융) | 온보딩·검색·게이미피케이션 | (보조 참고) 강한 대비의 큰 타이포, 컬러 일러스트 카드의 표현력. 다크 테마 자체는 40~60대 타깃 가독성 리스크로 미채택 |
-| 폰코 (PC 랜딩) | 랜딩/다운로드 | (보조 참고) 히어로의 임팩트 있는 풀배경 컬러 사용 — 랜딩 히어로에 컬러 배경 적용 근거 |
-| MS Clarity (PC 랜딩) | 랜딩/소개 | (보조 참고) 제품 화면 목업을 히어로 우측에 크게 배치하는 B2B SaaS 구조 — 기존 10섹션 IA 유지 근거 |
+| 회원사 자동 가입 | `CheckCorpIsMember` → `RegistCorp` (예외 -32000: AddUserToCorp) | CERTKEY+회사정보(업태·전화·이메일 필수)+계정(ID/PWD 6~20자 자동 생성) |
+| 발행 | `RegistAndIssueCashBill` | CERTKEY·CorpNum·UserID·CashBillEx·SMSSendYN |
+| 상태 동기화 | `GetCashBillState` / `GetCashBillStates` | BarobillState: 1000임시/2000발급완료/2500전송중/**3000전송완료**/4000전송실패/7000취소 |
+| 전건 취소 | `CancelCashBillEx` | 원본 MgtKey + CancelMgtKey(새 취소거래 건, 별도 과금 가정) |
+| 부분 취소 | `CancelCashBillPartialEx` | + CancelAmount/Tax/ServiceCharge |
+| 학부모 조회 | `GetCashBillMailURL`(NK) | 60초 유효 URL |
 
-- 적용 원칙은 PRD 16.0을 준용하되 "정보 우선순위·레이아웃 구조" 차용을 유지하고,
-  색채 체계만 청색→웜 오렌지로 전면 교체. 기능·문구·데이터 바인딩은 불변.
-- 링크: https://uibowl.io/name/클래스%20101 ,
-  https://uibowl.io/name/뱅크샐러드 ,
-  https://uibowl.io/website/폰코?patterns=랜딩페이지 ,
-  https://uibowl.io/website/마이크로소프트%20클래리티%20(Microsoft%20Clarity)?patterns=랜딩페이지
+- CashBillEx 필수: MgtKey(24자 멱등키)·FranchiseCorpNum/MemberID/CorpName/CEOName/Addr/**Tel**·
+  IdentityNum·TradeType(N/D)·TradeUsage(1소득공제/2지출증빙)·TradeMethod(5=휴대폰)·Amount·Tax·
+  ServiceCharge. 선택: ItemName·HP·Email. 주민번호 미사용(TEN-002).
+- **TradeDate는 D-1까지만** — 전월 소급 불가. 발행은 입금확인/수동 트리거 시점 일시 사용.
+- 통신: SOAP XML. 우선 바로빌 "직접 HTTP 통신 규격"(Net::HTTP) 구현 — savon 젬은 Ruby 4
+  호환 미확인이므로 미채택(기본). 엔드포인트: 테스트 `testws.baroservice.com` / 운영
+  `ws.baroservice.com`, 키는 credentials barobill 키와 쌍으로 선택.
+- 인증: CERTKEY(연동인증키) = 파트너 키. CorpNum/UserID는 회원사(원장)별 값 → tenants 저장.
 
-### 승인 시 변경 가능한 대안
+## 3. 구현 범위
 
-- B안: 프리미엄 다크+그린 (뱅크샐러드 온보딩풍 — 딥 네이비/블랙 + 브랜드 그린)
-- C안: 청색 유지 + 표현력 업그레이드 (색 교체 없이 카드 밀도·타이포·섀도 강화)
+### 마이그레이션 (1회, 통합 생성)
+1. `cash_receipts`: tenant_id·invoice_id·mgt_key(유니크 인덱스)·cancel_mgt_key·
+   issue_type(income_deduction/expense_evidence)·state(9.2 상태 enum: needs_info/pending/
+   processing/issued/failed/cancel_pending/cancelled)·barobill_state(int)·nts_confirm_num(암호화 아님,
+   승인번호)·nts_confirm_message·identity_num(**암호화** — 휴대폰 or 사업자번호, 주민번호 금지)·
+   trade_date·amount·tax·service_charge·item_name·issued_at·cancelled_at·retry_count(기본 0)·
+   last_error·issued_by(처리자) — CR-001 멱등은 mgt_key 유니크로 보장
+2. `tenants` 추가 컬럼: `biz_tel`(사업장 전화)·`biz_type`(업태)·`email`(대표자 이메일)·
+   `barobill_corp_num`(사업자번호 — 기존 business_number 재사용 권장, 신규 불필요)·
+   `barobill_member_id`(바로빌 ID, 최초 가입 후 불변)·`barobill_joined_at`
+3. `guardians`: `business_number`(**암호화** — 지급증명용, TEN-003)
+4. `students`: `cash_receipt_issue_type`(기본 income_deduction — 원생별 선택)
 
-## 3. 디자인 토큰 변경안 (tailwind.config.js)
+### Service / Job
+- `Barobill::BaseService` — CERTKEY·엔드포인트 환경 분기(production=운영키+ws, 그 외=test키+
+  testws), cert_key 공백 시 **SIMULATED 모드**(외부 호출 없이 결과 시뮬레이션 — 솔라피 패턴 준용)
+- `Barobill::CashReceiptService` — issue/lookup/cancel/partial_cancel
+- `Barobill::MemberService` — check_member/regist_corp (원장 자동 가입, -32000 처리)
+- `CashReceipt::IssueJob` — 트리거 시점 호출: NEEDS_INFO 검사 → PROCESSING → 발행 → 상태 반영.
+  실패 시 CR-004(재시도 전 상태 재조회로 중복 배제) + CR-006(자동 재시도 1회 후 원장 이중 알림)
+- `CashReceipt::SyncJob` — PROCESSING 건 BarobillState 폴링 → 3000만 ISSUED(승인번호 저장),
+  4000 FAILED(사유 저장), 7000 CANCELLED (CR-003: 응답 확인 전 성공 표시 금지)
+- `Payment → 발행 훅`: `Payments::ConfirmService`(F4 본체는 후속)가 아니라
+  `CashReceipt::Triggerable` 관심사(모듈)로 `trigger_issue_for(payment/invoice)` 인터페이스 정의 —
+  F4 착수 시 호출부만 추가. 이번 실행에서는 수동 발행 경로와 테스트로 검증.
 
-| 토큰 | 현행 | 변경 | 비고 |
-|---|---|---|---|
-| canvas | #F7F9FC (쿨 블루톤) | #FAF8F5 (웜 아이보리톤) | 앱·랜딩 공통 배경 |
-| surface | #FFFFFF | #FFFFFF 유지 | |
-| ink | #191F28 | #1D1A16 (웜톤 잉크) | 대비 유지 |
-| muted | #667085 | #6B655D (웜톤 뮤트) | |
-| line | #E4E7EC | #E8E2D9 (웜톤 경계선) | |
-| brand.500/600/700 | #3478F6/#2563EB/#1D4ED8 (청색) | #F97316/#EA580C/#C2410C (웜 오렌지) | 600은 흰 글자 AA 대비 확보 |
-| brand.50/100/200 | #EEF4FF/#DBE7FE/#BDD3FD | #FFF4ED/#FFE8D9/#FDDCB5 | 배지·연한 배경 |
-| info | 청색 공용 | 오렌지 계열 공용(brand와 동일 스케일) | |
-| success/warning/danger | 현행 유지 | 현행 유지 | 도메인 상태 의미 보존. 단 brand(오렌지)↔warning(앰버) 시각 혼동 리스크 → 배지는 "배경+테두리+아이콘" 조합으로 구분, Reviewer 검증 항목 |
-| fontFamily | Pretendard 유지 | 유지 | |
+### 모델/컨트롤러/뷰 (원장 영역)
+- `CashReceipt` 모델: 상태 전이 검증(취소는 원본 연결 CR-005), 마스킹 표시(TEN-003),
+  mgt_key 생성 규칙(원생×당월×발급유형, 24자 이내)
+- 라우트: `resources :cash_receipts, only: %i[index show]` + 멤버 액션
+  `issue`(수동 발행)·`retry`(수동 재발행)·`cancel`(취소 — 사유 필수)
+- 뷰: 발행 이력 화면(월별·원생별·상태별 필터, CR 상태 배지 — 16.2 체계), 상세(승인번호·이력),
+  수동 발행/재발행 버튼, 취소 폼. `shared/` 파셜·웜 오렌지 토큰 체계 준수
+- 온보딩(step3 사업자 정보)에 사업장 전화·업태·이메일 필드 추가 + 가입 시 RegistCorp 시도
+  (실패해도 온보딩은 계속 — 재시도는 설정 화면 or 수동) — 최소 변경 원칙
+- 학부모 발행 안내: 솔라피 알림톡 템플릿 `cash_receipt_issued`(승인번호·금액) — ko.yml 문구 +
+  MessageLog 연동, 테스트는 SIMULATED. 알림톡 실심사 등록은 운영 과제로 병행 표기
 
-공통 컴포넌트 클래스(app/assets/tailwind/application.css): `.btn-*`, `.field-input` 등은
-brand 토큰 참조이므로 자동 반영. 추가로 카드/섹션 표현력 클래스(rounded-2xl·소프트 섀도·
-섹션 대비)를 검토·보강.
+### 테스트 (외부 API 실호출 금지 — 바로빌 어댑터는 스텁/시뮬레이션)
+- CR-001 mgt_key 유일성(모델 검증+DB 유니크), CR-002 트리거 인터페이스(수납 미확인 건 발행 차단),
+  CR-003 3000 이전 ISSUED 금지, CR-004 재시도 전 상태 재조회, CR-005 취소 원본 연결,
+  CR-006 실패 재시도 1회+알림, CR-007 대기열 순차 처리(SIMULATED에서 큐 동작)
+- TEN-002 주민번호 거부, TEN-003 identity_num 암호문 저장·마스킹 표시, TEN-004 스냅샷 불변,
+  TEN-001 타 테넌트 이력 404
+- 어댑터: 스텁 응답 파싱(성공/오류코드 -32000/-10001 등), SIMULATED 분기, 환경별 엔드포인트
+- 상한/경계: TradeDate D-1 검증(전월 발행 시도 → 거절 안내), 부분취소 금액 검증
 
-## 4. 대상 파일 (재구성 범위)
+## 4. Rule ID
 
-- `tailwind.config.js` — 디자인 토큰 전면 교체
-- `app/assets/tailwind/application.css` — 공통 컴포넌트 클래스 보강
-- `app/views/layouts/` — application.html.erb, landing.html.erb (헤더·하단탭·푸터 톤)
-- `app/views/shared/` — badge/button/card/empty_state/flash/form_field/page_header/stepper (8 파셜)
-- `app/views/landing/` — show + 10 파셜 (hero/problems/solution/features/demo/social_proof/plan_card/pricing/regulation/faq/final_cta/beta_form)
-- `app/views/dashboard/show.html.erb`
-- `app/views/students/` — index/show/new/edit/_form/import_new/import_result (7)
-- `app/views/invoices/` — index/edit/cancel/results (4)
-- `app/views/reminders/` — index/settings/preview/history (4)
-- `app/views/onboarding/` — step2~step5 (4)
-- `app/views/registrations/new.html.erb`, `app/views/sessions/new.html.erb`
-- `app/views/beta_applications/` — new/_form/done (3)
-- 총 약 45개 뷰 파일 + 2 설정 파일
+CR-001~007 (핵심), TEN-001/002/003/004, MSG-001/002(학부모 안내 알림톡은 MSG 스택 재사용),
+PAY 연계는 훅 인터페이스만. PRD 22장 원문 기준.
 
-**불변 원칙**: 라우트·컨트롤러·모델·Job·로직·i18n 문구 키 변경 금지. 뷰 마크업·클래스·
-CSS만 변경. 기존 데이터 바인딩·Turbo/Stimulus 훅(data-* 속성) 보존 필수.
-a11y(44px 터치 영역, 대비 AA, aria 속성)는 기존 수준 유지·개선.
+## 5. Phase 2 문서 현행화 (Full 필수)
 
-## 5. Rule ID / PRD 근거
+- PRD 10.1: 현금영수증 경로를 포트원 → **바로빌 발급대행**(SOAP, CERTKEY+회원사)으로 교체·보강
+  (10.x 신설 권장: 10.3 공통 요구사항 유지). 7장 F5 명세의 "포트원 현금영수증 API" 문구 → 바로빌.
+  14장 CashReceipt 데이터 모델·tenants/guardians/students 추가 컬럼 반영. 22장 CR 규칙 유지 확인.
+- AGENTS.md: 시스템 구성·외부 연동 표에 바로빌 추가(진행 표는 Phase 9)
+- `_workspace/02_prd_update.md` 기록
 
-- 퍼블리싱 변경이므로 비즈니스 로직 Rule의 직접 구현은 없음. 다만 뷰 표시 관련:
-  - **TEN-003 계열**: 표시용 마스킹 유지 (뷰에서 마스킹 풀지 않기)
-  - **INV/PAY 상태 표시**: 상태 배지(success/warning/danger)의 도메인 의미 유지
-- PRD 13장(랜딩, 섹션 IA·문구 유지) / 16장(퍼블리싱 — 16.1 브랜드 컬러 재정의)
-- 접근성: PRD 16.1 (터치 44px 이상, 40~60대 가독성)
-
-## 6. Phase 2 문서 현행화 (Full 필수)
-
-- `PRD.md` 16.1: 브랜드 주색 #3478F6(청색) → 웜 오렌지(#EA580C) 재정의, 색채 규율 문구 갱신,
-  16.3 레퍼런스에 uibowl 2차 조사 결과 추가. 13장은 IA·문구 불변 확인(수정 없음이면 기록만).
-- `AGENTS.md`: Phase 9에서 진행 상황 표 갱신 (Phase 2에서는 사전 메모만).
-- `_workspace/02_prd_update.md`에 변경 섹션 기록.
-
-## 7. 위임 계획 (절약 모드)
+## 6. 위임 계획 (절약 모드)
 
 | Phase | 프로필 | 작업 |
 |---|---|---|
-| 3 | wonbikok-developer-lite 1개 | §3~4 전 범위 구현. 단일 위임(공유 파일 중심). 산출물 `03_implementation.md` |
-| 4 | (오케스트레이터 직접) | bin/rubocop + bin/brakeman + bin/rails test |
-| 5 | wonbikok-reviewer-lite 1개 | 변경 diff 리뷰. 산출물 `05_review.md` |
-| 6 | wonbikok-developer-lite 1개 | 리뷰 지적 수정 (지적 시에만) |
-| 7 | wonbikok-tester-lite 1개 | 전체 테스트 회귀 + 뷰 셀렉터 의존 테스트 수정. 산출물 `07_test_report.md` |
-| 8 | (오케스트레이터 직접) | 서버 기동 실행 검증 → `08_run_report.md` |
+| 3 | wonbikok-developer-lite 1개 | §3 전 범위 단일 위임 (마이그레이션 1회 통합 생성 포함). 산출물 `03_implementation.md` |
+| 4 | 오케스트레이터 직접 | rubocop·brakeman·rails test |
+| 5 | wonbikok-reviewer-lite 1개 | CR 규칙·TEN 격리·멱등·SOAP 어댑터 검증. `05_review.md` |
+| 6 | wonbikok-developer-lite 1개 | 지적 시 최소 수정 |
+| 7 | wonbikok-tester-lite 1개 | CR/TEN 시나리오 회귀 + 스텁 기반 신규 테스트. `07_test_report.md` |
+| 8 | 오케스트레이터 직접 | 부트 검증 + **스파이크(별도)**: rails runner 1회 — 테스트키+testws로 RegistCorp(원비콕 자체 사업자정보 필요 — 승인 시 제공) + 발행 1건 → GetCashBillState 3000 확인. 사업자정보 미제공 시 스파이크는 보류·보고 |
 
-각 스폰 직후 위임 실측(hard rule 9) → `00_delegation_log.md` 기록.
+각 스폰 직후 effort 실측 → `00_delegation_log.md`.
 
-## 8. 리스크
+## 7. 리스크
 
-1. **brand(오렌지)↔warning(앰버) 혼동** — 납부 예정(앰버) 배지와 CTA(오렌지)의 시각 구분.
-   → 배지 구성(배경+테두리) 차별화 + 리뷰 검증 항목 명시.
-2. **테스트 셀렉터 의존** — CSS 클래스 문자열을 assert하는 기존 테스트 존재 가능.
-   → Phase 7에서 전체 회귀 + 필요 시 테스트 수정.
-3. **40~60대 대비(AA)** — 오렌지 배경+흰 텍스트 대비. → 600톤 #EA580C(대비 3.6:1, 대형
-   텍스트/컴포넌트 AA) 확인, 본문 링크는 700톤 사용.
-4. **범위 과대** — 뷰 45파일 일괄 변경. → 단일 Developer 위임 + Phase 4 기계 검증으로 통제.
+1. **SOAP 직접 구현 난이도** — savon 미채택( Ruby 4 호환 미확인)으로 Net::HTTP+XML 직접 구성.
+   응답 파싱 오류 가능성 → 어댑터 단위 테스트로 스텁 XML 고정
+2. **F4 미구현으로 자동발행 트리거 부재** — 훅 인터페이스+수동 발행으로 대체. F4 착수 시 연결
+3. **운영키 노출 환경** — dev/test 기본 SIMULATED·testws 분기 필수(어댑터 테스트로 검증)
+4. **알림톡 템플릿 미심사** — cash_receipt_issued 템플릿은 카카오 심사 필요(운영 과제), 구현은
+   SIMULATED
+5. **범위 과대(F5 단일 위임)** — 마이그레이션 통합 1회·직렬 단일 위임·Phase 4/5 게이트로 통제
