@@ -8,3 +8,4 @@
 | 2026-11-16 12:50경 | 6 (2차 수정·F5) | wonbikok-developer-lite | account:zai-individual-coding-plan/GLM-5.3-Flash | low | low (model-io-35d2b915 10건) | ✅ 일치 — R1·R2·경미 수정, 230 runs 0 실패 |
 | 2026-11-16 13:05경 | 5 (재리뷰 2차·F5) | wonbikok-reviewer-lite | (재사용 agent_241d2353) | high(정의) | 측정 불가 — 백그라운드 재개 | **APPROVED** (루프 2회차 내 해소) |
 | 2026-11-16 13:20경 | 7 (테스트·F5) | wonbikok-tester-lite | account:zai-individual-coding-plan/GLM-5.3-Flash | low(정의) | 측정 불가 — 로그 롤오버(스폰 후 즉시 미측정) | W3-R 해소·231 runs 0 실패 |
+| 2026-11-16 14:00경 | 스파이크 수정 | wonbikok-developer-lite (신규 agent_606d3569) | account:zai-individual-coding-plan/GLM-5.3-Flash | low(정의) | 측정 불가 — 로그 롤오버 위험 | base_service require net/http/uri 추가, 231 runs 유지 |
