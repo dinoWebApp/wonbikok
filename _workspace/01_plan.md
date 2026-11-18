@@ -1,82 +1,70 @@
-# 01_plan.md — W3 잔여 병렬 배치: F4 입금 확인 + F9 학부모 청구 링크
+# 01_plan.md — W4 병렬 배치: F7 대시보드 + F8 구독·결제 + 관리자 A1·A2·A3
 
 - 작성일: 2026-11-18
-- 파이프라인: **병렬 배치 (HARNESS_CONVENTION §6.14)** — `0 → 1-P → ✋승인(배치 1회) → 2(직렬) → 3-P(병렬 구현 ×2) → 3-S(통합) → 4 → 5 → 6? → 7-P(선택) → 7-S → 8 → 9`
-- 호출 프로필(일반 모드): wonbikok-developer / wonbikok-reviewer / wonbikok-tester
-- 선행 완료: F5(바로빌) — Triggerable `trigger_issue_for(invoice, issued_by:, origin:)` 게이트·Invoice enum PAID/PARTIALLY_PAID 선활성화 상태
+- 파이프라인: **병렬 배치 (§6.14)** — `0 → 1-P → ✋승인(배치 1회) → 2 → 3-P(f7∥f8∥admin, 상한 3) → 3-S(통합) → 4 → 5 → 6? → 7-P? → 7-S → 8 → 9`
+- 프로필(일반 모드): wonbikok-developer / wonbikok-reviewer / wonbikok-tester
+- A5(현금영수증 발행 관리)는 본 배치 제외 — A1·A2·A3 이후 별도 태스크(AGENTS 후보 조합 준수)
 
-## 1. 태스크 분해 (AGENTS 병렬 후보 조합 채택)
+## 0. 범위 확정 결정 (오케스트레이터 판단 — 승인 대상)
 
-| task-id | 범위 | PRD | Rule ID |
+1. **F8 v1.0 최소형**: PRD "정기결제 도입 전(P1 이전) 수동 결제·파일럿 무료 운영 대체 가능" 조항 채택 —
+   실제 카드 결제·빌링키 발급은 **포트원 어댑터 SIMULATED**(바로빌/솔라피 패턴 준용, 포트원 키 미등록).
+   구현: Subscription 도메인(30일 체험 자동 시작·플랜·상태 전이)·SUB-001 상한 차단·D-7 알림(Recurring·
+   SIMULATED)·수동 결제 기록·결제 실패 재시도 프레임(상태 전이 중심).
+2. **F7 PDF 저장은 후속 과제** — 마감 리포트는 HTML 화면으로 구현(Node/npm 없는 스택에서 PDF 젬
+   선정[prawn 등]·플랜 게이팅은 F8 상태 의존이라 별도 태스크로 분리).
+3. **관리자 OTP**: A0 이메일+비밀번호+2단계 인증 — 로컬/1인 운영에 맞는 **사전 공유 시크릿 기반 6자리
+   TOTP 간단 구현**(외부 젬 불필요 수준, 데이터 모델은 확장 가능 설계). 별도 주소는 라우트 네임스페이스로
+   분리(운영 배포 시 서브도메인 격리 가능 구조).
+4. **A2·A3의 Subscription 참조**: 병렬 의존 해소를 위해 **Subscription 시그니처를 본 플랜에서 사전 고정**
+   (아래 §2) — admin 태스크는 이 가정으로 작성, 3-S에서 대조·결선(F4/F9 성공 패턴).
+
+## 1. 태스크 분해·소유권 표
+
+| task | 범위 | 소유 파일 | 공유(3-S) |
 |---|---|---|---|
-| **f4** | 입금 확인 — Payment 도메인: 미확인 원생 리스트, 새 입금 등록+매칭 힌트(금액·이름 후보 추천), 체크 처리(전액/부분), 오체크 취소(이력), **F5 Triggerable 연결(origin: :auto)** | 7장 F4(308행) | PAY-001~004, CR-002, INV-003(취소청구 제외), TEN-001/004 |
-| **f9** | 학부모 청구 링크 — 공개 토큰 페이지 `/b/{token}`: 교습소명·문의처(원터치 발신), 금액 큰 글씨·내역, 납부 기한·상태, 계좌 복사 원탭(clipboard 토스트), 현금영수증 자동발급 안내, 링크 취소·재발급, 만료 안내 페이지 | 8장(425행) | LNK-001~005, TEN-001/003, INV(스냅샷 표시) |
-| **integ**(3-S) | 통합 — 마이그레이션 단 1회(payments 테이블 + invoices.public_token/토큰 상태), routes 결선, ko.yml 병합, invoice.rb 수정(토큰·납부상태 헬퍼), invoices 뷰 수정(F4 진입 + F9 링크 버튼), 전체 게이트 | — | 전체 정합 |
+| **f7** 마감 대시보드 | 이번 달 청구/수납/미납/납부율+기준 명시·오늘 할 일(미확인 입금·발행 실패·리마인더 예정) 상단·빠른 작업·미발행 잔여 경고(월말 가산세 문구)·마감 리포트 HTML·원생별 수납 이력(students/show)·빈 상태 온보딩 | `app/controllers/dashboard_controller.rb`(수정)·`app/views/dashboard/*`(수정)·`app/services/dashboard/summary_service.rb`(신규)·`app/views/students/show.html.erb`(수정 — 이력 섹션만)·`test/services/dashboard/*`·`test/controllers/dashboard_controller_test.rb` | routes·ko.yml |
+| **f8** 구독·결제 | Subscription(§2 시그니처)·가입 시 30일 체험 자동 시작·SUB-001 원생 상한 차단(students create 가드)·플랜 표시·수동 결제 등록(사유)·결제 실패 3회 재시도 상태 프레임(SUB-002)·체험 D-7 알림 Job(SIMULATED)·구독 화면(플랜·상태·결제 이력) | `app/models/subscription.rb`·`app/services/subscriptions/*`(trial_start·plan_change·payment_record·retry_policy)·`app/services/portone/billing_service.rb`(SIMULATED)·`app/controllers/subscriptions_controller.rb`·`app/views/subscriptions/*`·`app/controllers/students_controller.rb`(수정 — 상한 가드만)·`app/controllers/registrations_controller.rb`(수정 — 체험 시작 훅만)·`test/**` | 마이그레이션·routes·ko.yml·`config/recurring.yml` |
+| **admin** A1·A2·A3 | A0 공통(AdminUser 이메일+비밀번호+OTP·감사 로그·마스킹 원칙)·A1 운영 대시보드(24h 실패·지표·대응 대기 큐)·A2 이용자 관리(통합 검색·상세·이벤트 타임라인·조치[플랜 변경·체험 연장 30/60 상한·정지] — ADM-001 사유 필수)·A3 구독·결제 관리(결제 이력·실패 모니터링 D+30 카운트다운·환불 분기·매출 집계) | `app/models/admin_user.rb`·`app/models/audit_log.rb`·`app/controllers/admin/`(base·sessions·dashboards·tenants·subscription_payments)·`app/views/admin/**`·`app/views/layouts/admin.html.erb`·`app/services/admin/`(tenant_timeline·refund_policy)·`test/**` | 마이그레이션·routes(`Admin::`)·ko.yml |
+| **integ**(3-S) | 마이그레이션 **1회**: subscriptions·admin_users·audit_logs / routes 결선(subscriptions 리소스·Admin 네임스페이스·대시보드는 기존) / ko.yml 병합 / `config/recurring.yml`(체험 D-7·필요시 결제 재시도 배치) / Subscription 시그니처 대조(f8 vs admin 가정) / 앱 레이아웃 네비에 구독 진입 추가 / 전체 게이트 선행 | — | 전부 |
 
-## 2. 병렬 안전 판정 (3조건)
+## 2. Subscription 시그니처 사전 고정 (f8·admin 공통 가정 — 3-S 대조 기준)
 
-| 조건 | f4 ∥ f9 | 판정 |
-|---|---|---|
-| 파일 소유권 분리 | 아래 표 — 겹치지 않음(둘 다 신규 파일 중심) | ✅ |
-| 의존 없음 | f4는 F5 Triggerable(기존)만 호출, f9는 invoice 상태를 읽기만(읽기 의존은 무해) | ✅ |
-| 공유 파일 비수정 | routes.rb·마이그레이션 체인·ko.yml·invoice.rb·invoices 뷰·PRD/AGENTS — **병렬 태스크 수정 금지, 전부 3-S 통합에서 처리** | ✅ (규약 준수 설계) |
+- 컬럼: `tenant_id(유니크)`·`plan(light/standard)`·`status(trial/active/past_due/suspended/cancelled)`·
+  `trial_started_at`·`trial_ends_at`·`current_period_start`·`current_period_end`·`cancel_scheduled_at`
+- 메서드(예상): `trial_remain_days`·`plan_limit(:students)`→ {light: 30, standard: 70}·`trial_expiring?(days:)`
+- 수동 결제 기록은 `subscription_payments` 대신 **본 배치에서 Subscription에 1:N `admin/payment_records`?
+  → 단순화: `PaymentRecord` 모델 추가는 과대 — A3 결제 이력은 `SubscriptionEvent` 이벤트 소스(타입:
+  trial_started/manual_payment/payment_failed/retry/past_due/suspended/plan_changed/refund)로 통일 —
+  **이벤트 타임라인(A2)과 결제 이력(A3)을 동일 테이블 `subscription_events`로 서빙**(생성: f8 도메인 서비스)
+- 포트원 빌링키: 실발급 SIMULATED — `billing_key_uid` 컬럼은 v1.0 제외(필요 시 P1 추가)
 
-## 3. 파일 소유권 표 (병렬 fan-out)
+## 3. 병렬 판정 (3조건)
 
-### task-f4 (생성 전용)
-- `app/models/payment.rb` (컬럼 가정: invoice_id·tenant_id·amount·paid_on·method·memo·status(active/cancelled)·cancel_reason·cancelled_at·cancelled_by·confirmed_by·confirmed_at — 마이그레이션은 3-S)
-- `app/services/payments/confirm_service.rb` (체크 처리·부분납·완납 전이 invoice.update!·**Triggerable origin: :auto 호출**·PAY-001 재완납 차단)
-- `app/services/payments/matching_hint_service.rb` (PAY-003: 금액·원생명 후보 추천, 자동 선택 아님)
-- `app/controllers/payments_controller.rb` (미확인 리스트·새 입금 등록 폼·create·cancel)
-- `app/views/payments/*.erb` (미확인 리스트·등록 폼·취소 폼)
-- `test/models/payment_test.rb`·`test/services/payments_*_test.rb`·`test/controllers/payments_controller_test.rb`
-- 산출물 `_workspace/parallel/f4/03_implementation.md`
+1. 소유권 분리: 위 표 — 교차 없음(students_controller=f8·students/show 뷰=f7으로 분리 배정) ✅
+2. 의존 없음: f7은 기존 도메인(invoices·payments·cash_receipts) 읽기만·admin은 Subscription §2 가정 ✅
+3. 공유 파일 비수정: routes·마이그레이션·ko.yml·recurring.yml·레이아웃 전부 3-S ✅
 
-### task-f9 (생성 전용)
-- `app/controllers/billing_links_controller.rb` (공개·비로그인: show_by_token — TEN-001 노출 최소·LNK-002)
-- `app/services/billing_links/token_service.rb` (LNK-001 예측 불가 토큰 생성·재발급·취소 — invoices.public_token 가정)
-- `app/javascript/controllers/clipboard_controller.js` (계좌 복사 원탭·토스트 — Stimulus)
-- `app/views/billing_links/show.html.erb`·`expired.html.erb` (금액>계좌>안내 위계·웜 오렌지 토큰·LNK-003 만료 안내)
-- `test/controllers/billing_links_controller_test.rb`·`test/services/billing_links_token_service_test.rb`
-- 산출물 `_workspace/parallel/f9/03_implementation.md`
+## 4. fan-out 공통 제약 (각 Developer 프롬프트 포함)
 
-### integ (3-S 통합 — 단일 Developer)
-- 마이그레이션 1개: `payments` 테이블 + `invoices.public_token(string·유니크)·public_token_revoked_at·public_token_issued_at`
-- `config/routes.rb`: payments 리소스 + `/b/:token` 공개 라우트 + 원장 쪽 링크 발급/취소 액션
-- `config/locales/ko.yml` 병합, `app/models/invoice.rb`(토큰 헬퍼·납부 상태 표시용), `app/views/invoices/index.html.erb`(F4 입금확인 진입 + F9 링크 버튼 열)
-- MessageLog 발송 링크에 청구 URL 포함(F3 안내 알림톡에 /b/{token} 주입 — 솔라피 SIMULATED 유지)
+소유권 화이트리스트·자기 파일 rubocop만·전체 테스트/마이그레이션/서버 기동 금지(3-S 후)·문서 수정 금지·
+컬럼은 §2 가정(불일치는 3-S 대조에서 조정)·Subscription 시그니처 변경 금지(양측 가정 기준).
 
-## 4. fan-out 위임 공통 제약 (각 Developer 프롬프트에 포함)
+## 5. Phase 2 문서 현행화 (승인 후 직렬 1회)
 
-- 소유권 화이트리스트: 위 표의 자기 파일만 생성/수정 — **routes.rb·마이그레이션·ko.yml·invoice.rb·기존 뷰·PRD/AGENTS 수정 금지**
-- 자체 검증: `bin/rubocop`/`bin/brakeman` 자기 파일 인자로만, `bin/rails test` 전체 실행 금지(형제 태스크 코드로 오탐)
-- repo-wide 금지: 마이그레이션 생성·전체 테스트·서버 기동은 3-S 이후만
-- 컬럼/모델 의존은 "3-S에서 확정할 시그니처 가정" 하에 작성(f4: Payment 컬럼명 위 표, f9: invoice.public_token 가정) — 통합 시 불일치 발견되면 3-S에서 조정
+PRD v2.7: 14장 W4 확정 블록(Subscription·subscription_events·AdminUser·AuditLog 스키마·F8 v1.0 최소형
+범위[실결제 SIMULATED·수동 결제]·F7 PDF 후속·OTP 방식)·11장 파일럿 무료 운영 주석 보강. 02_prd_update.md.
 
-## 5. Phase 2 문서 현행화 (직렬 1회, 승인 후)
+## 6. Rule ID
 
-- PRD.md: 14장 W3 F4/F9 구현 확정 사항 블록(Payment 스키마·토큰 설계·매칭 힌트 정책), 9.1 납부 상태 전이 완결(PAID/PARTIALLY_PAID 전이 주체=ConfirmService), 오픈 이슈(W-N1/W-N2 정책 확정 반영)
-- AGENTS.md: 진행 표는 Phase 9에서 갱신(Phase 2에서는 규칙 표 필요시만)
-- `_workspace/02_prd_update.md` 기록
-
-## 6. 실행 계획 (승인 후 자동)
-
-| Phase | 내용 | 프로필 |
-|---|---|---|
-| 2 | PRD 현행화(직렬) | 오케스트레이터 |
-| 3-P | f4·f9 동시 구현(상한 2 ≤ 3) | wonbikok-developer ×2 |
-| 3-S | 통합(마이그레이션 1회·routes·ko.yml·invoice.rb·뷰 결선) + db:migrate + 전체 게이트 선행 | wonbikok-developer ×1 |
-| 4 | rubocop·brakeman·rails test 전체 | 오케스트레이터 |
-| 5 | 리뷰(PAY·LNK·CR-002 연결·공개 페이지 노출 집중) | wonbikok-reviewer |
-| 6? | 지적 시 최소 수정 | wonbikok-developer |
-| 7-S | 전체 테스트 게이트(+필요 시 시나리오 보강은 Reviewer 지적 기반) | wonbikok-tester |
-| 8 | 부트 검증(/b/{token} 비로그인 200·payments 302 포함) | 오케스트레이터 |
-| 9 | 완료 보고·AGENTS 진행 표·progress 리셋 | 오케스트레이터 |
+F7: INV/PAY/CR 표시 정합(기존)·SUB-001(f8)·SUB-002/003/004(상태·알림)·ADM-001/002(admin 핵심)·
+TEN-001/003(admin 마스킹·검색)·MSG(이중 전달 표시는 알림 SIMULATED 기록)
 
 ## 7. 리스크
 
-1. **컬럼 가정 불일치**(f4/f9가 가정한 시그니처 ↔ 3-S 마이그레이션) — 3-S에서 대조·조정, 게이트로 방어
-2. **공개 페이지 노출**(LNK-002) — Reviewer 집중 검증 항목으로 지정(타 청구·내부정보 미노출)
-3. **PAY-001 완납 재처리 차단** — ConfirmService 가드 + DB 제약(3-S) 이중 방어
-4. **invoice.rb 통합 충돌** — 병렬 태스크가 수정 안 하므로 구조적 예방, 3-S 단일 수정
-5. F4 UI가 invoices 뷰 진입 버튼을 필요로 하나 3-S에서 결선 — 병렬 태스크는 payments 뷰 내부만 완결
+1. Subscription 가정 불일치(f8↔admin) — §2 고정+3-S 대조(F4/F9 성공 패턴 재사용)
+2. 관리자 배치 분량 과대(A0+A1+A2+A3) — 조회 중심 MVP로 축소: A1 지표 중 추이 그래프는 숫자 표로
+   대체(차트 라이브러리 없음·후续), A2 데이터 내보내기는 후속, A3 환불은 정책 분기 표시+기록(실 환불
+   이체는 외부) — 플랜에 명시된 축소만
+3. OTP 구현 오류 — 로그인 잠금 5회·감사 로그와 함께 Reviewer 집중 항목
+4. 체험 D-7 Recurring 잡 — recurring.yml 공유(3-S)·SIMULATED

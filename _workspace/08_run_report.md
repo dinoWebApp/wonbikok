@@ -1,19 +1,23 @@
-# 08_run_report.md — 실행 검증 (Phase 8, F4+F9 병렬 배치)
+# 08_run_report.md — 실행 검증 (Phase 8, W4 병렬 배치)
 
-- 실행일: 2026-11-18 · `bin/rails server -p 3212` 직접 구동
+- 실행일: 2026-11-18 · `bin/rails server` 직접 구동(3213·3214)
 
 ## 부트 로그
 
-- `=> Booting Puma` / `Puma version: 8.1.1` / Listening 정상 · ERROR/Exception 0건
+- Puma 8.1.1 정상 기동 · 2차 실행 오류/Exception 0건
+- (1차 실행의 오류 1건은 검증자의 잘못된 경로 요청 `/admin/login`에 대한 RoutingError — 앱 결함 아님. 실제 로그인 라우트는 `/admin/session/new`)
 
 ## HTTP 응답
 
 | 경로 | 응답 | 판정 |
 |---|---|---|
 | `/` (랜딩) | 200 | ✅ |
-| **`/b/invalidtoken...` (F9 공개 링크·무효 토큰)** | **404** | ✅ **LNK-003 실동작 확인** — 무효/폐기 토큰은 청구 정보 없이 만료 처리(유효 토큰 200 경로는 컨트롤러 테스트로 커버) |
-| **`/payments` (F4 신규, 비인증)** | **302** | ✅ 인증 필수 라우트 정상 |
-| `/cash_receipts` (F5) | 302 | ✅ 회귀 없음 |
+| `/subscription` (F8 원장 구독, 비인증) | 302 | ✅ 인증 게이트 |
+| `/admin` (A1, 비인증) | 302 | ✅ 관리자 인증 리다이렉트 |
+| **`/admin/session/new` (관리자 2단계 로그인)** | **200** | ✅ 공개 로그인 화면 정상 렌더 |
+| `/admin/tenants` (A2, 비인증) | 302 | ✅ 게이트 |
+| `/admin/subscription_payments` (A3, 비인증) | 302 | ✅ 게이트 |
+| `/dashboard/report` (F7 리포트, 비인증) | 302 | ✅ 인증 게이트 |
 
 ## WARN 분류
 
@@ -21,4 +25,6 @@
 
 ## 후속 과제 (리뷰·테스트 보고서 기록분)
 
-취소 이력 사유 조회 뷰·부분납 리마인더 잔액 표기·카카오 "청구링크" 변수 규격 통일(운영 템플릿 등록 시)·운영 URL placeholder(배포 전 config)·LNK-004 접근 로그(A4/A9 착수 시)
+SUB-002 자동 정지 배치(실패 원천 P1)·데이터 삭제 배치(SUB-003 D+30 실행부)·포트원 실호출 전환(P1)·
+관리자 정지 실차단(tenant 잠금 필드)·suspended 원장 앱 게이팅·A1 드릴다운 3종·체험 연장 trial 복귀 정책(W-4)·
+전화번호 검색(암호화 제약)·F7 PDF·A5(현금영수증 발행 관리)

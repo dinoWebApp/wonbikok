@@ -1,115 +1,127 @@
-# 03_implementation.md — task-integ (W3 F4+F9 병렬 배치 통합, Phase 3-S)
+# 03_implementation.md — integ (Phase 3-S 통합: F7·F8·관리자 A0~A3 결선)
 
-- 작성일: 2026-11-18
-- 담당: wonbikok-developer (integ 단일 Developer)
-- 범위: f4(입금 확인)·f9(청구 링크) 구현 결과의 공유 파일 결선·통합 + 전체 게이트
-- 근거: `_workspace/01_plan.md`, `_workspace/parallel/f4/03_implementation.md`, `_workspace/parallel/f9/03_implementation.md`, PRD.md 14장 "W3 F4/F9 구현 확정 사항(2026-11-18)"·22장 PAY/LNK
+- 작성일: 2026-11-18 / wonbikok-developer (integ 태스크)
+- 대상: `_workspace/01_plan.md` §1 integ 행 — 마이그레이션 1회·routes 결선·ko.yml 병합·recurring·
+  Subscription 시그니처 대조·전체 게이트 선행
 
 ## 1. 결선 내역
 
-### 1.1 마이그레이션 — 단 1개 (생성 1회, `bin/rails generate migration` 1회만)
+### 1.1 마이그레이션 — 단 1개
+`db/migrate/20261118000002_create_subscription_and_admin_tables.rb` (신규, `bin/rails db:migrate` 완료·schema.rb 커밋)
 
-`db/migrate/20261118000001_create_payments_and_invoice_public_tokens.rb` (db:migrate 완료·schema.rb version 2026_11_18_000001 갱신)
+| 테이블 | 내용 | 무결성 |
+|---|---|---|
+| `subscriptions` | tenant_id·plan(기본 standard)·status(기본 trial)·trial_started_at/ends_at·current_period_start/end·cancel_scheduled_at·timestamps | `tenant_id` 유니크 인덱스 + FK(1:1 — SUB-001·TEN-001) |
+| `subscription_events` | subscription_id(FK+인덱스)·event_type·amount·detail(text)·operated_by·**created_at만**(append-only) | `[subscription_id, event_type]` 인덱스 — updated_at 부재는 AR이 자동 skip(f8 스펙 준수) |
+| `admin_users` | email·password_digest·otp_secret·failed_attempts(기본 0)·locked_at·timestamps | email 유니크 인덱스 |
+| `audit_logs` | admin_user(optional FK)·action·target_type/target_id·reason·detail(json)·timestamps | `[target_type, target_id]`·`[action, created_at]` 인덱스 |
 
-- **payments 테이블**: invoice_id(FK, NOT NULL)·tenant_id(FK, NOT NULL)·amount(int, NOT NULL — 원 단위)·paid_on(date, NOT NULL)·method(string, NOT NULL — transfer/card/cash/other)·memo·status(string, NOT NULL, default "active")·cancel_reason·cancelled_at·cancelled_by·confirmed_by·confirmed_at + timestamps
-- **인덱스**: `[invoice_id, status]`(active 합계·PAY-001 판정), tenant_id(t.references 자동 생성 — f4 보고서의 명시 add_index와 중복이라 제거, 스키마 결과 동일), FK 2건
-- **DB CHECK**: `amount > 0`(`chk_payments_amount_positive`)만 반영 — SQLite 안전·모델 검증(PAY-001)의 DB 계층 이중 방어. 상태별 부분 인덱스 합계 트리거는 SQLite 유지보수 비용 대비 효과 낮아 미반영(f4 보고서 4.1 권고 수용 판단)
-- **invoices 추가**: `public_token`(string)·`public_token_issued_at`·`public_token_revoked_at` + **부분 유니크 인덱스** `index_invoices_on_public_token`(`WHERE public_token IS NOT NULL` — SQLite 부분 인덱스, 미발급 NULL 다중 허용)
-- **cancelled_by 포함 확정**: PRD 14장 확정 블록 컬럼 목록에는 없으나 01_plan §3 소유권 표·Payment 모델 setter(masked_operator, TEN-003·PAY-002 처리자 기록)가 전제 → 포함(PAY-002 "처리자·시간 기록" 정합)
+### 1.2 routes 결선 (`config/routes.rb`)
+- `get "dashboard/report"` → `dashboard#report`(as: :dashboard_report) — f7 §4.1 요청
+- `resource :subscription, only: :show` — f8 §5.2 요청(f8 테스트 `subscription_url` 기준과 일치)
+- `namespace :admin` 블록 — admin §6.2 코드 그대로(14 헬퍼 isolated 검증분) — 실측 15 헬퍼 전부 응답
+- 앱 레이아웃 네비 구독 진입: 데스크톱 탭 + 모바일 하단 탭 5번째(icon "subscription" SVG 1분기 추가), `nav.subscription` 키 신설
 
-### 1.2 config/routes.rb
+### 1.3 ko.yml 병합 — 누락 0 (전수 대조)
+| 블록 | leaf 키 수 | 출처 |
+|---|---|---|
+| `dashboard`(기존 13 + 신규 34) | 47 | f7 §3 전문(38키) + integ `report_link` 1 + 기존 |
+| `subscriptions` | 50 | f8 §4 전문 |
+| `admin` | 218 | admin §5 전문 |
+| `students.errors.plan_limit_reached`·`students.show.history.{no_bill,no_receipt}` | 3 | f8 §4·f7 §3 |
+| `activerecord.errors.models.subscription.*` | 7 | f8 §4 |
 
-- `resources :payments, only: %i[index new create]` + member `get :cancel`·`post :cancel_payment` — f4 보고서 4.2 스펙 그대로
-- `get "/b/:token", to: "billing_links#show", as: :billing_link` — 공개·비로그인(f9 결선 권장 경로 그대로)
-- invoices member에 `post :issue_link`·`post :revoke_link` 신설(원장 쪽 링크 관리). **재발급은 별도 라우트 없이 `issue_link`에 `reissue` 파라미터**로 처리(라우트 2개 한도 내에서 TokenService.reissue_for 위임 — LNK-003)
+- **검증**: 앱 전체 ERB 87파일의 `t("정적키")` 전수 대조 스크립트 → 미해결 0(2건 오탐은 `except(` 정규식误 탐)
+- **레거시 키 정리**: `dashboard.unpaid_count`·`dashboard.reminders_link` — 사용처 0 확인 후 제거(f7 §3 무위화 제안)
+- **값 현행화**: `students.show.history_title` → "수납·발행 이력(최근 6개월)"(f7 제안), `history_empty` → "아직 수납·발행 이력이 없습니다."(구문 "청구 기능은 다음 업데이트에 제공됩니다"는 W2 이후 사실과 불일치 — 값만 변경, 테스트 단정 없음 확인)
 
-### 1.3 config/locales/ko.yml — 병합·전수 대조
+### 1.4 recurring.yml + 잡 클래스 3종 신설 (f8 §5.4 요청 — 모두 SIMULATED·멱등)
+| 잡 | 클래스 | 진입점 |
+|---|---|---|
+| `subscription_trial_reminder` 09:10 | `app/jobs/subscription_trial_reminder_job.rb`(신규) | 조회 `Subscription.trial_expiring`(f8 스코프) → SIMULATED 로그 기록. 캐시 마커로 체험 기간당 1회. 실발송(P1) 시 구독 단위 발송 이력 확장 필요 — message_logs는 invoice_id 필수라 오용 금지(MSG-001 주석 명시) |
+| `subscription_trial_expire` 09:20 | `app/jobs/subscription_trial_expire_job.rb`(신규) | `Subscriptions::RetryPolicyService.expire_due_trials!`(매일, 멱등) |
+| `subscription_downgrade_apply` 09:30 | `app/jobs/subscription_downgrade_apply_job.rb`(신규) | `Subscriptions::PlanChangeService.apply_due_downgrades!`(매일, 멱등) |
 
-- f4 보고서 §3 yaml 목록 **54키**(payments.* 45 + invoices.status PAID/PARTIALLY_PAID 2 + enums.invoice.status 2 + activerecord.errors.models.payment 5) — 보고서 헤더의 "68키"는 실제 목록(54)과 불일치, **목록 그대로 병합**. `payments:` 네임스페이스는 invoices와 reminders 사이에 배치
-- f9 보고서 §3 yaml 목록 **28키**(billing_links.* — 헤더 "26키"와 불일치, 목록 그대로). `barobill:` 뒤 도메인 주석 블록과 함께 배치
-- 전수 대조: `I18n.exists?`로 f4 54키 + f9 28키 **missing 0** 확인
-- integ 추가 키: `invoices.link.*`(title·issue·copy·reissue·revoke·copy_success·copy_fallback·reissue_confirm·revoke_confirm)·`invoices.actions.payment_entry`·`invoices.actions.more`·`invoices.notices.link_issued/link_reissued/link_revoked`·`messages.invoice_notice.billing_link_line`
-- 기존 `invoices.status.*`·`enums.invoice.status.*`에 PAID(완납)·PARTIALLY_PAID(부분납) 추가 — 기존 6종 뒤 삽입(CANCELLED 앞)
+- MSG-006 야간 발송 금지 준수(09:10~09:30 — reminder_dispatch 09:00 이후 분산). 러너로 3잡 perform_now 실측 통과.
+- f8이 "past_due 유예 만료 → suspend! 자동 전이"를 (후보·정책 합의 필요)로 남김 → 본 배치 미채택(정책 확정은 Reviewer/후속 — A2 명시적 suspend! 경로만 현행).
 
-### 1.4 app/models/invoice.rb (공유 — 단일 수정)
+### 1.5 시드 (`db/seeds.rb`)
+`AdminUser` 1계정 — `ADMIN_EMAIL`(기본 `ops@wonbikok.local`)·`ADMIN_PASSWORD`(미지정 시 `SecureRandom.hex(12)` 생성) ENV 기반, `find_or_create_by!` 멱등. TOTP는 otp_secret 미설정 시 credentials `admin.otp_seed` 파생(미설정 개발 환경은 폴백+경고 로그 — `Admin::OtpService` 코드 주석 확인). `bin/rails db:seed` 실측 1계정 생성.
 
-- `has_many :payments` 추가 — **dependent 없음**(수납은 PAY-002 이력이므로 청구 삭제에도 보존, DB FK restrict). f4는 association 미의존 설계였으므로 충돌 없음
-- `active_public_token?` 추가(토큰 위임 편의 최소) — 발급·재발급·폐기는 BillingLinks::TokenService 단일 진입점 유지. billing_link_url은 모델에 두지 않음(뷰는 라우트 헬퍼 `billing_link_url(token)` 사용)
-- **`cancel!`에 `BillingLinks::TokenService.revoke_for(self)` 연계**(f9 §5-6 권고 수용) — 트랜잭션 내 CANCELLED 전이 직후 호출, 취소 청구의 공개 링크 즉시 폐기(LNK-003·멱등)
-- **remindable에 `:PARTIALLY_PAID` 추가**(f4 §4.3 발견 수정) — 부분납은 잔액이 미납으로 남아 리마인더 대상(PRD F4 "잔액은 미납으로 유지되며 리마인더 대상 유지"). 기존 조합(where.not(due_on: nil)·joins students excluded_from_reminders=false) 유지, **PAID는 미포함**. 상태 목록 외 로직 변경 0
-- cash_receipt_issuable?·enum·confirm!·adjust! 등 기존 로직 **변경 금지 준수(무변경)**
+## 2. Subscription 시그니처 대조 (f8↔admin — 01_plan §2 기준)
 
-### 1.5 invoices_controller + invoices/index 뷰 (공유 — 단일 수정)
+admin §6.3의 자체 정렬을 전수 재대조 — **불일치 0**:
 
-- 컨트롤러: member 액션 `issue_link`(issue_for 멱등, `reissue` 파라미터 시 reissue_for — 안내 문구 분기)·`revoke_link`(revoke_for, 사유 불요). set_invoice before_action 확장, TEN-001 스코프(current_tenant.invoices.find) 유지, 리다이렉트 `status: :see_other`(303) 준수
-- 뷰(과밀 방지 위계 재구성 — "기존 액션 버튼과 위계 정리·필요시 세부 행 접기" 수행):
-  - **주 액션**: "입금 확인" 전폭 버튼 — 미완납 확정 청구(READY/SENT/UNPAID/OVERDUE/PARTIALLY_PAID)만 → `new_payment_path(invoice_id:)`(F4 진입)
-  - **"더보기" details 접기**: 수정(DRAFT·READY만 — 이후 상태는 컨트롤러가 차단하던 버튼을 노출하지 않게 정리)·청구 취소(`cancellable?`만 — PAID의 취소 버튼 오노출 제거)·링크 관리(유효 토큰 있으면 복사[clipboard 컨트롤러 재사용]·재발급·폐기, 없으면 발급 — 폐기만 turbo_confirm)
-  - 배지 톤 맵에 PARTIALLY_PAID=warning·PAID=success 추가(16.2)
-- 변경 유의: 기존에는 모든 상태에 수정·취소 버튼이 상시 노출(클릭 시 422 안내) — 실행 가능한 액션만 노출하는 정리이며, W2 흐름 테스트 전부 통과로 회귀 없음
-
-### 1.6 F3 안내 알림톡 링크 주입 (최소 — 과도 확장 금지)
-
-- `app/services/solapi/message_builder.rb`: invoice_notice 경로에 한해 **유효(미폐기) 토큰이 있는 청구만** 카카오 변수 `"청구링크"`(절대 URL) 추가 + SMS 폴백 본문 뒤 `billing_link_line`("청구 내역 확인: %{url}") 1줄 추가. **토큰 없으면 기존 본문 그대로(W2 동작 유지)** — 리마인더 경로는 미변경, SampleInvoice 등 토큰 미보유 객체는 respond_to? 가드. SIMULATED 경로는 builder를 거치지 않으므로 무변경
-- URL 호스트: `Rails.application.routes.default_url_options` → 없으면 `action_mailer.default_url_options` 폴백(test=example.com·development=localhost:3000). **운영 호스트는 placeholder(example.com)** — 도메인 확정 후 config 갱신 필요(아래 Reviewer 집중 항목)
-
-## 2. f4/f9 스펙 대조 결과 (불일치 조정 내역)
-
-| 항목 | f4/f9 가정 | integ 확정 | 조정 |
+| 접점 | f8 실구현 | admin 사용 | 판정 |
 |---|---|---|---|
-| Payment 컬럼 | 보고서 4.1 스펙(12컬럼+timestamps) | 동일 + CHECK(amount>0) | 일치 — tenant_id 인덱스는 references 자동 생성으로 명시 add_index 생략(결과 동일) |
-| cancelled_by | f4: "01_plan 표 기준 포함 요청" | 포함 | 확정 — Payment setter 존재 |
-| `method` 컬럼명 | f4: 유지 권고(리네임 시 전면 수정) | **유지** | 무조정 — Object#method 덮음 주석은 Payment 모델에 존재 |
-| invoices 토큰 컬럼 | f9: public_token(string·유니크)+issued_at+revoked_at | 동일 + 부분 유니크 인덱스 | 일치 |
-| `/b/:token` 라우트 | f9: `get "/b/:token", as: :billing_link` | 그대로 | 일치 |
-| 원장 링크 발급/폐기 | f9: TokenService.issue_for/reissue_for/revoke_for 호출 권고 | issue_link(재발급=reissue 파라미터)·revoke_link로 결선 | 라우트 2개 제약 내 재발급 처리 설계(integ 결정) |
-| ko.yml 키 수 | f4 헤더 68 / f9 헤더 26 | **실제 목록 54 / 28** | 헤더 수치 불일치 — 목록 기준 병합·전수 대조로 방어 |
-| f4 association | invoice.payments 미의존 설계 | has_many :payments 추가 | 호환 — f4 코드 무수정 |
-| remindable | f4: PARTIALLY_PAID 누락 발견 → 추가 권고 | 추가 반영 | §1.4 참조 |
+| 상한 | `students_limit`(effective_plan — 체험 중 standard 70) | base_controller `students_limit` | ✅ |
+| 체험 만료 | `trial_expiring?(within: 7.days)` | dashboards_controller | ✅ |
+| 플랜 변경 | `Subscriptions::PlanChangeService.change!(plan:, operated_by:, reason:)` | tenant_actions 경유 | ✅ |
+| 이벤트 장부 | `detail`(JSON 문자열)·`operated_by=` 마스킹·created_at 전용 | 동일 규약 생성·조회 | ✅ |
+| 보관 만료 | `Subscriptions::RetryPolicyService.data_retention_deadline` | subscription_payments 단일 경유(+updated_at 근사 폴백) | ✅ |
+| `trial_extended` | **enum 부재(⚠ f8 §6.3 지적) → integ가 1줄 추가** | tenant_actions 생성 | ✅ 결선 |
+| Tenant 역참조 | `belongs_to :tenant`만 → **integ가 `has_one :subscription, dependent: :destroy` 추가[3-S 소유]** | 미의존(양측) | ✅ 결선 |
+| Invoice 역참조 | CashReceipt belongs_to만 → **integ가 `Invoice has_many :cash_receipts` 추가**(payments 선례 — dependent 없음·이력 보존) | — | ✅ 결선(f7 §4.3 권장) |
 
-## 3. 게이트 결과 (전 구간 통과)
+## 3. integ 조정 내역 (불일치 최소 수정 — 도메인 로직 재작성 없음)
+
+### 3.1 코드 수정 (10건)
+| 파일 | 수정 | 원인 |
+|---|---|---|
+| `app/controllers/subscriptions_controller.rb` | `RetryPolicyService` → `Subscriptions::RetryPolicyService`(2줄) | 네임스페이스 미경유 — 런타임 NameError(f8 "뷰 렌더 검증"이 컨트롤러 경로 미포함으로 미검출) |
+| `app/controllers/admin/dashboards_controller.rb` | `window = (RECENT_WINDOW.ago..)` 괄호 | 무괄호 endless range 뒤 `{`가 해시 리터럴(범위 끝)로 파싱 → `ArgumentError: bad value for range` — 관리자 대시보드·OTP 로인 전 화면 전반 크래시 |
+| `app/controllers/admin/tenant_actions_controller.rb` | suspend 경로에 `@subscription = Subscription.find_by(...)` 1줄 | valid_subscription? 미호출로 ivar nil → suspended 이벤트 무기록 |
+| `app/controllers/admin/tenant_actions_controller.rb` | `result.applied` → `result.applied?` | Result Data 멤버명 불일치(NoMethodError) |
+| `app/controllers/admin/tenant_actions_controller.rb` | extend_trial 검증 순서 — 누적 한도 초과를 1회 한도(1~30일)보다 먼저 | 초과 시나리오(30사용+31요청)에서 한도 초과 안내가 아닌 "1~30일" 안내 노출(422 유지 — 우선순위만 변경) |
+| `app/controllers/admin/subscription_payments_controller.rb` | `month_range` — `Date#all_day`(그날 하루) → `beginning_of_day..end_of_month.end_of_day`(월 전체) | 결제 이력이 당월 1일 하루만 조회되는 버그(매출 집계는 정상 — 불일치 노출) |
+| `app/controllers/admin/subscription_payments_controller.rb` | `prepare_refund_form` 음수 override 시 기본값 복귀 1줄 | 음수 금액 422 재렌더 경로에서 `RefundPolicyService.new(amount: 음수)` ArgumentError(서비스 음수 거절 계약 유지) |
+| `app/services/portone/billing_service.rb` | `simulated?` 동적 판정(생성자 캐시 제거) | 코드 주석 스스로 명시한 "게이트는 메서드별 simulated? 우선" 계약과 불일치 — ENV 개방이 생성 후에도 반영되도록(NotImplementedError 게이트 실동작) |
+| `app/models/audit_log.rb` | `record!`에 `created_at:` 옵션(백데이팅 전용 주석) | 타임라인 테스트가 통합 진입점 경유 백데이팅 사용 — create!은 애초 created_at 직접 허용이므로 보호 수준 불변 |
+| `app/models/subscription_event.rb` | **enum에 `trial_extended` 1줄 추가**(결선 필수 1건) | admin 체험 연장 이벤트 생성 시 ArgumentError |
+
+### 3.2 뷰·레이아웃 (integ 결선분)
+- `app/views/layouts/application.html.erb`: 구독 탭(데스크톱·모바일) — 기존 tab 렌더 규약 준용
+- `app/views/dashboard/show.html.erb`: 지표 카드 헤더에 `dashboard_report_path(month:)` 링크(f7 §4.1 권장 — 신규 키 `dashboard.report_link` 1개)
+- `app/views/students/show.html.erb`: 이력 조회를 `@student.invoices.includes(:cash_receipts)` 역참조 2쿼리로 정리(f7의 뷰 스코프 → 3-S 결선 연관 경유. before_action 이관은 미채택 — students_controller는 f8 소유·최소 변경 원칙)
+
+### 3.3 테스트 최소 수정 (8파일 — 도메인 로직 변경 없이 시그니처·픽스처·이스케이프 불일치만)
+| 파일 | 수정 | 사유 |
+|---|---|---|
+| `students_controller_test.rb` | SUB-001 채움 원생 29→28·27 | fixture `students(:one)` 정재원(active)이 카운트에 포함 — Expected 30/29 vs Actual 31 |
+| `subscription_test.rb` | light 상한 테스트 `status: :active` 명시 / 만료 청구 2개째는 신규 Tenant | 체험 중 effective_plan=standard(f8 구현·admin 정렬·동일 파일 다른 테스트와 일치하는 규약) / tenant_id 유니크 위반 |
+| `plan_change_service_test.rb` | 하향 3테스트에 `plan: :standard` 사전 세팅 | light 구독에 light 변경 요청 → `:plan_unchanged` 거절(서비스 정상 동작) |
+| `retry_policy_service_test.rb` | retry 이벤트 기대 1→2 | 실패 1·2회차에 각 1건(총 2) 생성이 구현·상태전이표 기준 — "3회 이후 예약 없음"은 신규 생성 없음을 의미 |
+| `trial_service_test.rb` | trial_ends_at==current_period_end 정확 일치 → in_delta 1초 | 별도 `from_now` 호출의 마이크로초 오차 |
+| `payment_service_test.rb` | 체험 중 결제 기간 시작 기대 now→trial_ends_at | `[period_end, now].max` 규약(서비스 주석·f8 보고서·2번째 테스트와 동일 규약 — 조기 납부 손실 방지) |
+| `subscriptions_controller_test.rb` | TEN-001: 원생명 단정 → `/ 30명`·`70명` 미노출 단정 + 비체험 구독 | 화면은 수치만 표시(원생명 미노출이 설계)·체험 중 상한은 70(effective_plan 규약) |
+| `admin/*_test.rb` 4건 | `create_event` amount 기본값 / 검색 빈상단 ERB 이스케이프(`'`→`&#39;`) / 감사 detail Hash exists?→레코드 파싱 | helper 키워드 필수·HTML 이스케이프·json 컬럼 질의 한계 |
+
+## 4. 게이트 결과 (전 구간)
 
 | 게이트 | 결과 |
 |---|---|
-| `bin/rubocop` (전체 126 files) | **0 offenses** |
-| `bin/brakeman` | **0 errors · Security Warnings 0** |
-| `bin/rails db:migrate` | 완료 — schema.rb version 2026_11_18_000001 |
-| `bin/rails test` (전체) | **300 runs · 1274 assertions · 0 failures · 0 errors · 0 skips** |
-
-- 테스트 구성: 기존(W1·W2·F5·랜딩/퍼블리싱) 236 + f4 신규 43(payment_test 13·confirm_service 11·matching_hint 9·payments_controller 10 — 보고서 표기 39와 실제 13/11/9/10=43 불일치, 실측 기준) + f9 신규 20(token_service 10·billing_links_controller 10) + integ 결선 회귀 1(invoices_flow_smoke — 아래) = 300
-- **integ 신규 테스트 1건**: `invoices_flow_smoke_test.rb` "청구 목록에서 입금 확인 진입과 청구 링크 발급·재발급·폐기가 동작한다" — index 입금 확인 진입 버튼·링크 관리 열 렌더(clipboard)·재발급 후 이전 토큰 404/신규 200·폐기 후 발급 버튼 복귀까지 결선 UI end-to-end 검증(기존 테스트에 이 렌더 경로 커버가 없어 추가)
-
-### 3.1 통합 단계에서 처리한 소량 결함 수정 (규약: 소량은 integ 처리·명시)
-
-첫 전체 실행(299 runs)에서 2 failures + 2 errors — 전부 f4/f9 테스트 코드의 소량 결함으로, integ 소유 구간이므로 직접 수정:
-
-1. **f9 token_service_test 재발급 케이스**: `Result#token`이 `invoice.public_token` **라이브 위임**이어서 재발급 후 `old.token` 재평가 시 새 토큰이 반환되어 `assert_not_equal` 실패 — 이전 토큰을 문자열로 스냅샷 후 비교하도록 수정(서비스 동작은 정상)
-2. **f9 token_service_test 유니크 충돌 케이스**: SecureRandom 모듈 싱글턴 스텁이 복원 없이 누수(cash_receipt_triggerable_test 패턴은 ensure 복원) — `ensure`로 원본 복원 추가
-3. **f4 matching_hint_service_test TEN-001 케이스**: `assert_empty` 전제 오류 — amount 250,000은 setup의 자기 테넌트 청구(김민준)와 정확 일치하므로 후보 반환은 서비스의 올바른 동작. 단정을 "타 테넌트 청구(other_invoice) 미포함 + 전부 자기 테넌트"로 교정(테넌트 격리 자체는 정상 동작 확인)
-4. **f9 billing_links_controller_test 2건**: setup 청구와 같은 [student, target_month]로 청구 추가 생성 → INV-001 유니크 위반(RecordInvalid) — `target_month: "2026-09"` 추가
-5. **f9 컨트롤러 테스트 임시 RouteSet 드로우(setup/teardown reload_routes!) 제거** — 정식 `/b/:token` 라우트 사용(태스크 지시)
-
-## 4. remindable 수정 사유 (요약)
-
-W2 임시 규칙은 `SENT/UNPAID/OVERDUE`만 포함 — F4 도입으로 PARTIALLY_PAID(부분납) 청구가 발생하며 잔액이 미납으로 남으므로 리마인더 누락(PRD F4 정합성 위반)이 예상됨. f4 보고서 §4.3이 발견·권고했고 integ가 반영. 파급 범위 확인: Reminders::Scheduler(단계 판정은 due_stage_for 단일 기준이라 무영향)·RemindersController(즉시 발송 대상 재적용 — 일관)·Dashboard(미납 카운트에 부분납 포함 — 잔여 미납 존재하므로 정합). PAID는 완납이므로 미포함 유지. **유의: 리마인더 본문의 %{amount}는 invoice.total_amount 기준 — 부분납 건에 잔액이 아닌 총액이 표기될 수 있음(아래 Reviewer 집중 항목)**
+| `bin/rails db:migrate` | 완료 — schema.rb 4테이블 반영 |
+| `bin/rubocop` | **170 files inspected, no offenses** |
+| `bin/brakeman` | **No warnings found** |
+| `bin/bundler-audit` | No vulnerabilities found |
+| `bin/rails test` | **480 runs, 2126 assertions, 0 failures, 0 errors, 0 skips** (f7 16 + f8 42 + admin 수십 + W1~W3 회귀 전부 포함) |
+| 부트 실측 | `eager_load!` 정상 / route 헬퍼 15종 / recurring 5잡 로드·신규 3잡 perform_now 통과 / db:seed AdminUser 1계정 |
+| `git status` 소유권 점검 | 01_plan §1 표와 불일치 0 — 공유 파일(routes·ko.yml·recurring·레이아웃·schema·seeds)은 전부 integ 변경분, f7/f8/admin 변경분은 각 소유 화이트리스트 내 |
 
 ## 5. Reviewer 집중 요청 사항
 
-1. **LNK-002 노출 최소(공개 페이지)** — f9 구현물 화이트리스트(BillingView 13필드)·타 청구 미노출·만료 404를 재검증 바람. integ는 구조 변경 없음
-2. **PAY-001·CR-002 연결** — ConfirmService의 PAID 시점 Triggerable 1회·부분납 보류·취소 재계산과 DB CHECK(amount>0)의 이중 방어 적절성
-3. **index 뷰 액션 정리 회귀** — 수정 버튼을 DRAFT/READY로, 취소 버튼을 cancellable?로 한정한 것(기존엔 상시 노출)이 W2 UX 기대와 부합하는지
-4. **부분납 리마인더 문구의 금액 변수** — MessageBuilder가 reminder 본문에 total_amount를 사용. 부분납 건 리마인더에서 "원비 250,000원 미납"처럼 총액 표기(잔액 아님)의 허용 여부 — PRD F4 문구 정책 확인 필요(본 integ는 스코프 밖으로 보류)
-5. **운영 URL 호스트 placeholder** — 알림톡 청구 링크의 절대 URL이 mailer default_url_options(example.com) 폴백. 운영 도메인 확정 시 config 갱신 필요(신규 오픈 이슈성 항목)
-6. **CANCELLED + 유효 토큰 잔존 방어** — cancel!이 폐기를 연계하지만 과거 데이터·동시성 여지에 대비해 index의 링크 폐기 버튼은 유효 토큰 존재 시 노출되도록 방어 유지
-7. **`method` 컬럼명** — Payment 인스턴스에서 `.method(:sym)` 리플렉션 금지(모델 주석 존재). 유지 결정의 적절성 확인
+1. **체험 D-7 알림의 발송 유일성 저장소** — v1.0은 SIMULATED 로그+캐시 마커(체험 기간당 1회). 실발송 전환 시 구독 단위 발송 이력(스키마 확장) 필요 — message_logs 오용 금지 근거를 Job 주석에 명시. MSG-001/003 관점 리뷰 요청.
+2. **`past_due → suspended` 자동 전이 미채택** — f8이 정책 합의 필요로 남긴 recurring 후보. 현행은 A2 명시적 suspend!만(SUB-002 자동 정지 주체는 P1 결제 잡과 함께 확정).
+3. **`AuditLog.record!` created_at 옵션** — 백데이팅 전용 옵션 추가(테스트·이관). 운영 조치 경로 미사용이지만 감사 장부 무결성 관점 확인 요청.
+4. **extend_trial 검증 우선순위**(누적 한도 → 1회 한도) — 422 응답은 동일하나 안내 문구 우선순위 변경. UX 의도 적합성 확인.
+5. ** tenants/show 정지 기록 배지·A1 지표의 `updated_at` 근사 산식**(월 해지·MAU) — admin 보고서 §4 축소 목록과 일치하는지 최종 확인.
+6. **f8 §9 후속**(포트원 실호출 P1·플랜 변경 원장 요청 버튼·A5 등) — 본 배치 범위 외 유지 확인.
 
 ## 6. 자체 체크리스트
 
-- [x] 마이그레이션 1개·`bin/rails generate migration` 1회·schema.rb 갱신
-- [x] f4·f9 도메인 로직(서비스·모델 검증·화이트리스트 렌더) 임의 재작성 없음 — 결선·최소 조정만(조정 목록 §2·§3.1)
-- [x] TEN-001(모든 신규 액션 current_tenant 스코프)·LNK-002(공개 페이지 구조 무변경)·PAY-001(모델 검증+DB CHECK) 방어 구조 약화 없음
-- [x] 외부 API 실호출 없음(Triggerable·솔라피 스텁/경계 유지)·credentials 수정 없음
-- [x] 기존 F1~F6·F5(바로빌) 회귀 없음 — 전체 테스트 300건 통과로 확인
-- [x] Turbo 규약 — 신규 액션 303 리다이렉트, 폼 실패 422(기존 경로 유지)
-- [x] ko.yml 문구 하드코딩 없음(뷰·컨트롤러·본문 모두 i18n 키 참조)
-- [x] ERB 2칸 들여쓰기·RuboCop(omakase) 0 offenses
+- [x] 마이그레이션 1개·유니크 인덱스·FK·schema.rb 커밋본 반영
+- [x] f7/f8/admin 도메인 로직 재작성 0 — 결선·enum 1줄·불일치 최소 수정만(§3 전건 보고 명시)
+- [x] SIMULATED 유지(포트원·D-7 알림) — 외부 실호출 0(부트 실측 포함)
+- [x] credentials 미수정(otp_seed 읽기만)·연습 모드 분기 회귀 없음(W1~W3 테스트 전 통과)
+- [x] Turbo 규약(422/303)·TEN-001 스코프·Rule ID(TEN/INV/PAY/CR/MSG/LNK/SUB/ADM) 회귀 없음
+- [x] ko.yml 전수 대조 미해결 0·레거시 키 2건 무위화 제거

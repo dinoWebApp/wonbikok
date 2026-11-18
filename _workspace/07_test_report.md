@@ -1,87 +1,94 @@
-# 07_test_report.md — F4+F9 병렬 배치 테스트 게이트 (Phase 7-S)
+# 07_test_report.md — W4 병렬 배치 테스트 게이트 (Phase 7-S)
 
-- 실행일: 2026-11-18 · 프로필: wonbikok-tester
-- 범위: 리뷰(05_review.md 1·2차) "Tester 제안" 시나리오 보강 + 전체 게이트
-- 소스 수정: **0건** (테스트 코드만 추가 — 기존 2파일에 보강 6건)
+- 실행일: 2026-11-18 · 프로필: wonbikok-tester · 판정: **PASS**
+- 범위: 1·2차 리뷰 "Tester 전달(중점)" 시나리오 고정 + 전체 게이트
+- 제약 준수: 소스(app/) 수정 0건 — 변경은 테스트 파일 7개에 한함
 
-## 1. 게이트 결과 (전 구간 통과)
+## 1. 게이트 결과 (실측)
 
 | 게이트 | 결과 |
 |---|---|
-| `bin/rails test` (전체) | **312 runs · 1389 assertions · 0 failures · 0 errors · 0 skips** |
-| `bin/rubocop` | **126 files inspected, no offenses** |
-| `bin/brakeman` | **Errors 0 · Security Warnings 0** |
+| `bin/rails test` | **490 runs, 2,216 assertions, 0 failures, 0 errors, 0 skips** (2차 리뷰 485 기준 +5 runs / +62 assertions) |
+| `bin/rubocop` | 170 files inspected, **no offenses** |
+| `bin/brakeman` | **No warnings found** |
 
-- 기준선 대비: 306 runs·1315 assertions(2차 리뷰) → **+6 runs · +74 assertions** (전부 본 보강분, 기존 테스트 회귀 0)
-- 실패 0건 — 원인 분류(버그 vs 테스트 오류) 해당 없음
-- 외부 실호출 0: Triggerable은 singleton 스파이(`define_singleton_method` + `ensure` 원본 복원)로 대체,
-  잔존 영수증 모사는 `CashReceipt.create!` 직접 생성(큐·바로빌 미진입), 솔라피 경로 미호출
+- 실패 원인 분류: 게이트 진행 중 1건(서비스 CSV 3행 테스트)이 픽스처 원생명 "박도윤"과의
+  이름 충돌로 실패 → **테스트 오류**(코드 버그 아님 — CSV 행 자체는 정상 오류행 처리됨).
+  테스트 데이터명을 "초과원생"으로 변경 후 재실행 통과. 소스 수정 없음.
 
-## 2. 보강 시나리오 내역 (신규 6건)
+## 2. 외부 실호출 격리 확인 (전부 유지)
 
-### test/controllers/payments_controller_test.rb (+3)
-
-| 테스트 | Rule ID | 내용 |
+| 연동 | 격리 장치 | 확인 |
 |---|---|---|
-| 완납 건 오체크 취소 — UNPAID 복원·미확인 리스트 복귀·영수증 잔존 | PAY-002·CR-002·CR-005 | 전액 확인(PAID·auto 1회) → 완납 건은 미확인 리스트 부재·이력 섹션 취소 진입(C1) → issued 영수증 잔존 상태에서 취소 폼 안내 문구("발행 이력 화면에서 별도 취소") 단정 → 취소 POST로 UNPAID 복원(due_on 미경과)·`CashReceipt.count` 불변·영수증 issued 유지 → 미확인 리스트 복귀(등록 진입 재노출·취소 이력 행 비노출)·트리거 호출수 1 유지 |
-| 기한 경과 완납 건의 오체크 취소 — OVERDUE 복원·리스트 복귀 | PAY-002 | due_on 3일 경과 PAID → 취소 → `OVERDUE?` 재계산 복원 + 미확인 리스트(등록 진입) 복귀 |
-| 부분납 후 추가 수납 완납 전이 시 트리거 1회 | CR-002 | 100,000 POST → PARTIALLY_PAID·calls 비어 있음(보류) → 150,000 POST → PAID·`origin: :auto` 정확 1회(청구·시점 단정) |
+| 포트원 | `Portone::BillingService` SIMULATED 이중 게이트(api_key 미등록 OR `PORTONE_LIVE!=1`) + 테스트 네트워크 스파이(`Net::HTTP.new` 접촉 시 예외) — portone_billing_service_test 5건 전부 통과 | ✅ |
+| 솔라피 | `FakeSolapiClient` 스텁 주입(from_credentials 교체·teardown 복원) — message_send_job_test | ✅ |
+| 바로빌 | 스텁 XML 파싱만(직접 HTTP 규격 스텁) — barobill_services_test | ✅ |
+| 트리거 | CashReceipt::Triggerable — Job enqueue 단정까지만(발행 실호출 없음) | ✅ |
 
-### test/services/payments/confirm_service_test.rb (+3)
+## 3. 리뷰 제안 시나리오 — 보강/생략 내역
 
-| 테스트 | Rule ID | 내용 |
+### 3.1 SUB-001 CSV 경계 회귀 고정 — 보강 3건 (신규)
+
+Phase 6 기존 6건(컨트롤러 4: 상한 422·잔여1×2행·휴원 집계 제외·레거시 create / 서비스 2:
+잔여1×2행·휴원·퇴원 무소진)과 중복되지 않는 경계만 추가:
+
+| 테스트 | 파일 | 내용 |
 |---|---|---|
-| 완납 이후 재수납 차단·수동 재발급·취소 조합에서 auto 1회 유지 | PAY-001·CR-002 | 완납(auto 1회) → 재수납 거절(추가 호출 없음) → 수동 재발급 시도는 `origin: :manual`로 구분 기록 → 취소는 트리거 미호출 → 최종 `calls.count(origin: :auto) == 1` |
-| 오체크 취소 후 재완납 — 새 PAID 전이로 트리거 재호출 1회 | CR-002·PAY-002 | 1회성은 청구 생애가 아닌 **PAID 전이 단위**임을 고정. 취소 후 재완납 시 `[ :auto, :auto ]` 2회(전이당 1회) — 실제 중복 발행은 Triggerable 내부 CR-001 멱등(mgt_key·duplicate)이 차단하는 구조를 문서화 |
-| 부분납 청구 추가 수납으로 완납 전이 시 그 시점 1회 | CR-002 | 부분납 보류(빈 calls) → 완납 전이 시점 `origin: :auto` 1회·대상 청구 ID 단정 |
+| 잔여 1 슬롯에 재원 3행은 1성공/2오류행(SUB-001) | students_csv_import_service_test.rb | 초과 행 **2행 이상**이 각각 행번호(3·4)와 "잔여 슬롯" 사유로 수집됨 — 기존은 2행/1오류뿐 |
+| 재원·휴원 혼합 파일에서 휴원 행 무소진(SUB-001) | students_csv_import_service_test.rb | 재원2+휴원1·잔여1 → 재원1성공+재원1오류(3행)+휴원1성공 — 혼합 파일에서 INV-004 무소진 |
+| 레거시 계정 CSV 등록 상한 없이 처리(SUB-001) | students_controller_test.rb | 구독 부재(nil=레거시) 단정 + CSV import 200 — 기존 레거시 핀은 create 경로만, C-1 대상 경로인 CSV는 미핀 |
 
-## 3. 리뷰 "Tester 제안" 3건 처리 결과
+### 3.2 ADM-001/002 — 보강 4파일 (기존 테스트 강화)
 
-| 제안 | 처리 |
+| 항목 | 판단 | 내용 |
+|---|---|---|
+| 사유 없는 4조치 422 | 기존 커버 | 플랜 변경·연장·정지·해제(tenant_actions 4건) + 환불(subscription_payments) — 전부 존재 |
+| **audit 미기록 단정** | **보강** | 기존 422 단정에 audit 부재 단정이 없었음 → `assert_rejected_without_reason` 헬퍼가 `AuditLog.count` 무증가 + 조치별 action·target 부재를 단정하도록 강화(플랜 변경·연장·정지·해제 4건에 일괄 적용). 환불 테스트도 `refund_confirmed` audit 미기록 + `AuditLog.count` 무증가 추가 |
+| **마스킹 원문 미노출** | **보강** | index는 기존 단정 존재(사업자번호·휴대폰 원문 `assert_no_match`) → 상세(show) 화면에 원문 2종 미노출 단정 추가(열람 audit이 발생하는 화면) |
+| OTP 5회 잠금(비밀+OTP 합산) | 기존 커버 — 생략 | sessions_controller_test "5회 실패(1·2단계 합산)" = 비밀번호 3회 + OTP 2회 → locked? + `account_locked` audit + 잠금 후 올바른 자격 차단까지 단정. 모델 경계(admin_user_test 4회 미잠금/5회 잠금)도 존재 |
+
+### 3.3 trial_extended 렌더 — 신규 1건
+
+| 테스트 | 파일 | 내용 |
+|---|---|---|
+| trial_extended 이벤트 라벨이 구독 이력에 정상 렌더(C-2) | subscriptions_controller_test.rb | `trial_extended` 이벤트 생성 → 원장 구독 화면에서 `subscriptions.events.trial_extended`("체험 연장") 라벨 렌더 + `translation_missing` 부재 단정. 기존의 enum 전수×키 존재 단정(subscription_test C-2)의 **실렌더 보강** — 3-S ko.yml 병합 완료 후 단정 가능해짐 |
+
+### 3.4 F7 정합 — 신규 1건 + 기존 커버 확인
+
+| 항목 | 판단 | 내용 |
+|---|---|---|
+| **미확인 입금 수 = payments#index 기준 일치** | **신규** | dashboard_controller_test: 혼합 데이터(미완납 3 + 초안·취소·완납·타월 제외 4) → 대시보드 할 일 "3명" 렌더 단정 + payments 화면 미완납 행 수 3(수납 등록 링크 셈)과 **일치 단정** + 초안·취소(INV-003)·타월 원생명 미노출. 기존 서비스 테스트는 기준 병렬 재구현이라 실렌더 핀이 없었음 |
+| 취소 청구(INV-003) 정산 제외 | 기존 커버 — 생략 | summary_service_test 2건(지표 정산 취소 200,000 제외·취소 전환 수납 정산 미포함) |
+| PAID×미발행 잔여 | 기존 커버 — 생략 | summary_service_test(issued 없는 PAID만·failed 보유도 대상) + dashboard_controller_test(무발행 원생 노출) |
+
+### 3.5 SUB-002/003 — 생략 (전부 기존 커버, 사유: f8 테스트와 중복)
+
+| 시나리오 | 기존 테스트 (중복이므로 미추가) |
 |---|---|
-| PAY-002 완납 건 오체크 취소 E2E (PAID→UNPAID/OVERDUE 복원·미확인 리스트 복귀·영수증 잔존 안내) | ✅ 보강 2건 + 안내 문구·영수증 잔존 단정 추가 (§2 컨트롤러 1·2번) |
-| LNK-003 CANCELLED issue_link/reissue 직접 POST 거부 유지 단정 | ⏭ **생략 — 기존 커버 확인** (중복 방지): `test/integration/invoices_flow_smoke_test.rb` "취소된 청구의 링크 발급 직접 POST는 거부되고 토큰이 발급되지 않는다"(issue+reissue POST·flash alert·`public_token` nil) + `test/services/billing_links/token_service_test.rb` blocked·부활 방지 2건 + `billing_links_controller_test.rb` 폐기·재발급 404 3건 |
-| CR-002 완납 트리거 1회성(재수납·재발급·취소 조합) — 스파이 유지 | ✅ 보강 2건 (§2 서비스 1·2번) — 스파이 방식 유지 |
-| (태스크 추가) 부분납 → 추가 수납 완납 전이 시 그때 트리거 1회 | ✅ 보강 2건 — 서비스(도메인 고정) + 컨트롤러(플로우) 이중 |
+| 3회 실패 → past_due 전이 | retry_policy_service_test "2회까지 active, 3회 past_due + 보관 만료일 기록"(SUB-002) |
+| suspend! | retry_policy_service_test "past_due에서만 허용 + suspended 이벤트 + 재정지 거절"(SUB-002) |
+| 재개 | payment_service_test "suspended 상태에서 수동 결제하면 재활성화(SUB-002 정지 해제)" |
+| D+30 카운트다운 | retry_policy_service_test "past_due 시점 + 30일 — remaining 30/1/0/-1"(SUB-003) + subscriptions_controller_test past_due 배너 렌더 |
 
-## 4. Rule ID 커버 매핑 (PAY / CR / LNK — 본 배치 갱신분)
+## 4. Rule ID 커버 매핑 (본 배치 보강분)
 
-### PAY
-
-| Rule ID | 정상 | 경계 | 예외 |
-|---|---|---|---|
-| PAY-001 | active 수납 생성·합계 산식 | 취소 이력 합계 제외→재등록 가능 | 완납 재수납: 모델 거절 / 서비스 거절+트리거 무호출 / 컨트롤러 422 / 조합 테스트(신규) |
-| PAY-002 | 취소 전이(사유·처리자 마스킹·시각)·UNPAID 복원 | OVERDUE 복원(due_on 기준)·복수 수납 1건 취소→PARTIALLY_PAID·재취소·사유 누락 | **완납 E2E(신규): 리스트 복귀·이력 행 비노출·영수증 잔존·안내 문구**·타 테넌트 취소 폼 404 |
-| PAY-003 | 금액·원생명 힌트 | 부분납 포함·정렬 | PAID/CANCELLED/DRAFT 제외·타 테넌트 제외 |
-| PAY-004 | duplicate 응답 무해 | — | 트리거 예외가 수납·PAID 전이를 롤백하지 않음 |
-
-### CR
-
-| Rule ID | 정상 | 경계 | 예외 |
-|---|---|---|---|
-| CR-001 | mgt_key 발급·IssueJob enqueue | 유니크 레이스 duplicate 통일 | 동일 청구 재트리거 skip — (신규 테스트가 "재완납 후 중복 발행은 Triggerable 내부 CR-001이 차단" 구조 문서화) |
-| CR-002 | 전액 확인 origin:auto 1회(서비스+컨트롤러) | **부분납 보류→완납 전이 시점 1회(신규 2건)** / **취소 후 재완납 전이 단위 1회(신규)** / **재수납·수동 재발급·취소 조합에서 auto 1회 유지(신규)** | auto 게이트 C3(UNPAID blocked)·취소 청구 blocked·취소는 트리거 없음(E2E 단정)·DRAFT manual 허용 |
-| CR-005 | (수동 취소 경로는 기존 cash_receipts 테스트 커버) | — | **오체크 취소가 영수증을 자동 취소하지 않음 + 수동 취소 안내 유도(신규 E2E 단정)** |
-
-### LNK (기존 커버 유지 — 신규 추가 없음)
-
-| Rule ID | 커버 | 위치 |
+| Rule ID | 보강 테스트 | 정상/경계/예외 |
 |---|---|---|
-| LNK-001 | urlsafe 32자·개인정보 미포함·멱등 재사용·충돌 재시도 | token_service_test |
-| LNK-002 | 13필드 화이트리스트·마스킹·타 청구/내부정보 미노출·no-store/noindex | billing_links_controller_test |
-| LNK-003 | 재발급→이전 토큰 404·폐기·blocked | token_service_test·billing_links_controller_test·**invoices_flow_smoke_test(직접 POST 거부)** |
-| LNK-005 | 폼 0·결제 버튼 부재 | billing_links_controller_test |
+| SUB-001 | CSV 잔여 1×3행(경계)·혼합 행 무소진(정상)·레거시 CSV 통과(정상) | 3건 |
+| ADM-001 | 사유 없는 5조치 × audit 미기록 단정(예외 — 기존 422 테스트 강화) | 5건 강화 |
+| ADM-002/TEN-003 | admin 상세 마스킹 원문 미노출(정상 — 기존 테스트 강화) | 1건 강화 |
+| C-2(i18n) | trial_extended 원장 화면 라벨 렌더(정상) | 1건 |
+| F7/INV-003 | 대시보드↔payments 미확인 입금 기준 일치(정합) | 1건 |
 
-## 5. 남은 갭 (후속 권장)
+## 5. 남은 갭 (테스트 범위 밖 — 기록)
 
-1. **LNK-004 접근 로그** — PRD 14장 W3 확정상 유예(f9 보고서 §5-7). A4/A9 관리자 착수 시 연계 구현·테스트 필요.
-2. **오체크 취소 → 현금영수증 수동 취소 전 경로** — 본 E2E는 "잔존 + 안내 문구"까지 단정. cash_receipts#cancel과 잇는 통합 시나리오는 F5 기존 커버와의 경계상 후속 여지.
-3. **부분납 리마인더 금액 표기(총액 vs 잔액)** — 리뷰 잔여 WARNING 그대로(문구 정책 확정 후).
-4. **PAY-001 동시성** — read-then-write 모델 + SQLite 단일 writer + 서비스 트랜잭션 + DB CHECK(amount>0) 이중 방어로 명시 수용(리뷰 W6). 프로세스 수평 확장 시 재검토.
-5. 취소 이력 사유 조회 뷰 — 리뷰 잔여 WARNING(후속).
+1. SUB-002 자동 정지 주체(배치)·데이터 삭제 배치(SUB-003 이행)·포트원 실호출(P1) — 02_prd_update 후속 과제로 문서화됨. 구현 전 테스트 대상 아님.
+2. 관리자 정지 실차단(v1.0 이력 기록만) — 후속 구현 시 TEN 측 차단 테스트 필요.
+3. 관리자 OTP 테스트는 개발 폴백 시크릿 경유(Rails.env.local? 한정 — otp_service.rb:83-84). 운영 otp_seed 운용 시 RFC 벡터 테스트로 대체 커버됨(otp_service_test).
+4. 체험 D-7 알림 잡은 SIMULATED 로그+캐시 마커 — 실발송 전환 시 발송 유일성 저장소 확장과 함께 테스트 보강 필요(integ §5.1).
 
 ## 6. 결론
 
-- 리뷰 1·2차 "Tester 제안" 시나리오 전부 해소(PAY-002 E2E·CR-002 1회성·부분납→완납 전이) — LNK-003은 기존 커버 확인으로 중복 생략.
-- 전체 게이트 3종 통과, 기존 306건 회귀 0, 소스 수정 0건(테스트만 추가), 외부 실호출 0.
-- **7-S 테스트 게이트: PASS** — F4+F9 병렬 배치는 APPROVED 상태 유지 가능.
+**PASS** — 1·2차 리뷰의 Tester 전달 항목을 5건 신규 + 3파일 기존 테스트 강화로 고정.
+전체 게이트(490 runs·RuboCop 0·Brakeman 0) 통과, 외부 실호출 장치 유지, 소스 수정 0.
+코드 버그 0건(진행 중 1건 실패는 테스트 데이터명 충돌 — 테스트 오류로 분류·수정).
