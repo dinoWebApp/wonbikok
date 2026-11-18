@@ -1,0 +1,92 @@
+<%= render "shared/page_header", title: t("payments.new.title"),
+      description: t("payments.new.subtitle") %>
+
+<%# 매칭 힌트 (PAY-003) — 추천은 참고용. '선택' 버튼은 폼 채움용(GET 재진입)이며
+    자동 제출·pre-select 없음 — 최종 판단은 원장 %>
+<%= render layout: "shared/card", locals: { class: "p-4 mb-5" } do %>
+  <h2 class="mb-3 text-sm font-bold text-ink"><%= t("payments.new.hint_title") %></h2>
+  <%= form_with url: new_payment_path, method: :get, class: "flex flex-wrap items-end gap-2" do %>
+    <div class="min-w-0 flex-1">
+      <%= label_tag :hint_amount, t("payments.new.hint_amount"), class: "text-xs font-semibold text-muted" %>
+      <%= number_field_tag :hint_amount, params[:hint_amount], min: 1, class: "field-input mt-1 w-full", inputmode: "numeric" %>
+    </div>
+    <div class="min-w-0 flex-1">
+      <%= label_tag :hint_name, t("payments.new.hint_name"), class: "text-xs font-semibold text-muted" %>
+      <%= text_field_tag :hint_name, params[:hint_name], class: "field-input mt-1 w-full" %>
+    </div>
+    <%= submit_tag t("payments.new.hint_search"), class: "btn-secondary min-h-11 shrink-0 px-4" %>
+  <% end %>
+
+  <% if @hint_candidates.present? %>
+    <ul class="mt-4 space-y-2 border-t border-line pt-3">
+      <% @hint_candidates.each do |candidate| %>
+        <li class="flex items-center justify-between gap-3">
+          <span class="min-w-0 text-sm">
+            <span class="font-semibold text-ink"><%= candidate.invoice.student_name_snapshot %></span>
+            <span class="text-muted">· <%= number_with_delimiter(candidate.invoice.total_amount) %><%= t("payments.won") %></span>
+            <% if candidate.matched_on == :amount %>
+              <%= render "shared/badge", tone: :info, text: t("payments.new.hint_matched_amount") %>
+            <% end %>
+          </span>
+          <%# PAY-003: 선택은 폼 채움용 링크 — 제출 아님 %>
+          <%= link_to t("payments.new.hint_select"),
+                new_payment_path(invoice_id: candidate.invoice.id,
+                                 amount: params[:hint_amount].presence || params[:amount].presence,
+                                 hint_amount: params[:hint_amount].presence,
+                                 hint_name: params[:hint_name].presence),
+                class: "btn-secondary min-h-11 shrink-0 px-3 text-xs" %>
+        </li>
+      <% end %>
+    </ul>
+    <p class="mt-2 text-xs leading-relaxed text-muted"><%= t("payments.new.hint_notice") %></p>
+  <% elsif params[:hint_amount].present? || params[:hint_name].present? %>
+    <p class="mt-3 border-t border-line pt-3 text-sm text-muted"><%= t("payments.new.hint_empty") %></p>
+  <% end %>
+<% end %>
+
+<%= render layout: "shared/card", locals: { class: "p-5" } do %>
+  <%= form_with model: @payment, url: payments_path, class: "space-y-3" do |f| %>
+    <%= render layout: "shared/form_field", locals: { form: f, attr: :invoice,
+          label_text: t("payments.new.invoice_label"), required: true } do %>
+      <%= f.select :invoice_id,
+            @invoice_rows.map { |row|
+              [ "#{row.invoice.student_name_snapshot} · #{t("payments.index.label_remaining")} #{number_with_delimiter(row.remaining_amount)}#{t("payments.won")}", row.invoice.id ]
+            },
+            { include_blank: t("payments.new.invoice_blank") },
+            class: "field-input" %>
+    <% end %>
+
+    <%= render layout: "shared/form_field", locals: { form: f, attr: :amount,
+          label_text: t("payments.new.amount_label"), required: true } do %>
+      <%= f.number_field :amount, min: 1, class: "field-input", inputmode: "numeric" %>
+    <% end %>
+
+    <div class="grid grid-cols-2 gap-3">
+      <%= render layout: "shared/form_field", locals: { form: f, attr: :paid_on,
+            label_text: t("payments.new.paid_on_label"), required: true } do %>
+        <%= f.date_field :paid_on, class: "field-input" %>
+      <% end %>
+      <%= render layout: "shared/form_field", locals: { form: f, attr: :method,
+            label_text: t("payments.new.method_label"), required: true } do %>
+        <%= f.select :method,
+              Payment::PAYMENT_METHODS.map { |m| [ t("payments.method.#{m}"), m ] },
+              { include_blank: t("payments.new.method_blank") },
+              class: "field-input" %>
+      <% end %>
+    </div>
+
+    <%= render layout: "shared/form_field", locals: { form: f, attr: :memo,
+          label_text: t("payments.new.memo_label") } do %>
+      <%= f.text_field :memo, class: "field-input" %>
+    <% end %>
+
+    <%# 체크(입금 확인) — 완납 시 현금영수증 자동발행 트리거(CR-002). 2탭 목표로 확인 단계 없음 %>
+    <p class="text-xs leading-relaxed text-muted"><%= t("payments.new.auto_issue_notice") %></p>
+    <%= render "shared/button", label: t("payments.new.submit"), form: f, size: :lg, class: "w-full" %>
+  <% end %>
+<% end %>
+
+<div class="mt-4">
+  <%= render "shared/button", label: t("common.back"),
+        url: payments_path(month: @month), variant: :secondary, class: "w-full" %>
+</div>

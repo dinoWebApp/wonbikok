@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_18_000001) do
   create_table "beta_applications", force: :cascade do |t|
     t.string "name", null: false
     t.string "title", null: false
@@ -86,6 +86,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
     t.text "change_history"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "public_token"
+    t.datetime "public_token_issued_at"
+    t.datetime "public_token_revoked_at"
+    t.index ["public_token"], name: "index_invoices_on_public_token", unique: true, where: "public_token IS NOT NULL"
     t.index ["student_id", "target_month"], name: "index_invoices_on_student_and_target_month", unique: true
     t.index ["student_id"], name: "index_invoices_on_student_id"
     t.index ["tenant_id", "target_month", "status"], name: "index_invoices_on_tenant_id_and_target_month_and_status"
@@ -113,6 +117,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
     t.index ["resend_of_id"], name: "index_message_logs_on_resend_of_id"
     t.index ["student_id"], name: "index_message_logs_on_student_id"
     t.index ["tenant_id"], name: "index_message_logs_on_tenant_id"
+  end
+
+  create_table "payments", force: :cascade do |t|
+    t.integer "invoice_id", null: false
+    t.integer "tenant_id", null: false
+    t.integer "amount", null: false
+    t.date "paid_on", null: false
+    t.string "method", null: false
+    t.string "memo"
+    t.string "status", default: "active", null: false
+    t.string "cancel_reason"
+    t.datetime "cancelled_at"
+    t.string "cancelled_by"
+    t.string "confirmed_by"
+    t.datetime "confirmed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["invoice_id", "status"], name: "index_payments_on_invoice_id_and_status"
+    t.index ["invoice_id"], name: "index_payments_on_invoice_id"
+    t.index ["tenant_id"], name: "index_payments_on_tenant_id"
+    t.check_constraint "amount > 0", name: "chk_payments_amount_positive"
   end
 
   create_table "sessions", force: :cascade do |t|
@@ -342,6 +367,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
   add_foreign_key "message_logs", "invoices"
   add_foreign_key "message_logs", "students"
   add_foreign_key "message_logs", "tenants"
+  add_foreign_key "payments", "invoices"
+  add_foreign_key "payments", "tenants"
   add_foreign_key "sessions", "users"
   add_foreign_key "solid_queue_batch_executions", "solid_queue_batches", column: "batch_id", on_delete: :cascade
   add_foreign_key "solid_queue_batch_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

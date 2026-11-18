@@ -42,13 +42,23 @@ Rails.application.routes.draw do
       post :send_batch    # READY 대상 발송(즉시/예약)
     end
     member do
-      get :cancel    # 취소 사유 폼
-      post :cancel   # 청구 취소 (INV-003) — 사유 폼 POST
-      post :resend   # 다시 보내기 (MSG-001 예외·이력 기록)
+      get :cancel        # 취소 사유 폼
+      post :cancel       # 청구 취소 (INV-003) — 사유 폼 POST
+      post :resend       # 다시 보내기 (MSG-001 예외·이력 기록)
+      post :issue_link   # 학부모 청구 링크 발급(멱등)·재발급(reissue 파라미터 — LNK-001/003)
+      post :revoke_link  # 학부모 청구 링크 폐기 (LNK-003 — 사유 불요·확인 후)
     end
   end
   delete "invoices/message_log/:message_log_id", to: "invoices#cancel_queue",
          as: :invoice_message_log # 예약 발송 취소 (MSG-007)
+
+  # 입금 확인 (W3 F4 — 수납·현금영수증 자동발행 트리거)
+  resources :payments, only: %i[index new create] do
+    member do
+      get :cancel           # 오체크 취소 사유 폼 (PAY-002)
+      post :cancel_payment  # 취소 처리(사유 필수 — PAY-002)
+    end
+  end
 
   # 미납 리마인더 (W2 F6)
   get "reminders", to: "reminders#index", as: :reminders
@@ -74,4 +84,7 @@ Rails.application.routes.draw do
 
   # 대시보드 (인증 후 앱 홈 — 루트가 랜딩으로 바뀌면서 이동, 2026-11-04)
   get "/dashboard", to: "dashboard#show", as: :dashboard
+
+  # 학부모 청구 링크 (W3 F9) — 공개·비로그인, 예측 불가 토큰 (LNK-001~003)
+  get "/b/:token", to: "billing_links#show", as: :billing_link
 end

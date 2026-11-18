@@ -69,6 +69,66 @@ class InvoicesFlowSmokeTest < ActionDispatch::IntegrationTest
     assert_match "조정액", response.body
   end
 
+  # W3 F4/F9 결선 — 청구 목록의 입금 확인 진입·청구 링크 관리(발급/복사/재발급/폐기)
+  test "청구 목록에서 입금 확인 진입과 청구 링크 발급·재발급·폐기가 동작한다" do
+    invoice = @tenant.invoices.create!(student: @student, target_month: @month,
+                                       student_name_snapshot: @student.name, base_amount: @student.monthly_fee,
+                                       due_on: Date.current, status: :READY)
+
+    # F4 진입 — 미완납 확정 청구에 입금 확인 버튼
+    get invoices_path(month: @month)
+    assert_response :success
+    assert_match "입금 확인", response.body
+    assert_match new_payment_path(invoice_id: invoice.id), response.body
+
+    # F9 발급(멱등) — 유효 토큰 보유 시 복사·재발급·폐기 열 노출
+    post issue_link_invoice_path(invoice)
+    assert_redirected_to invoices_path(month: @month)
+    token = invoice.reload.public_token
+    assert_not_nil token
+
+    get invoices_path(month: @month)
+    assert_match "링크 복사", response.body
+    assert_match "재발급", response.body
+    assert_match "링크 폐기", response.body
+
+    # 재발급 — 이전 토큰 즉시 만료(LNK-003)
+    post issue_link_invoice_path(invoice, params: { reissue: "1" })
+    assert_redirected_to invoices_path(month: @month)
+    new_token = invoice.reload.public_token
+    assert_not_equal token, new_token
+    get billing_link_path(token)
+    assert_response :not_found
+    get billing_link_path(new_token)
+    assert_response :ok
+
+    # 폐기 — 이후 목록에는 발급 버튼으로 복귀
+    post revoke_link_invoice_path(invoice)
+    assert_redirected_to invoices_path(month: @month)
+    get invoices_path(month: @month)
+    assert_match "링크 발급", response.body
+  end
+
+  # LNK-003/INV-003 — CANCELLED 청구 링크 발급 직접 POST 거부(뷰 버튼 숨김만으로는 부족)
+  test "취소된 청구의 링크 발급 직접 POST는 거부되고 토큰이 발급되지 않는다" do
+    invoice = @tenant.invoices.create!(student: @student, target_month: @month,
+                                       student_name_snapshot: @student.name, base_amount: @student.monthly_fee,
+                                       due_on: Date.current, status: :READY)
+    assert invoice.cancel!("테스트 취소")
+
+    post issue_link_invoice_path(invoice)
+
+    assert_redirected_to invoices_path(month: @month)
+    assert_equal "취소된 청구에는 청구 링크를 발급할 수 없습니다.", flash[:alert]
+    assert_nil invoice.reload.public_token
+
+    post issue_link_invoice_path(invoice, params: { reissue: "1" })
+
+    assert_redirected_to invoices_path(month: @month)
+    assert_equal "취소된 청구에는 청구 링크를 발급할 수 없습니다.", flash[:alert]
+    assert_nil invoice.reload.public_token
+  end
+
   private
 
   def log_in_as(user)

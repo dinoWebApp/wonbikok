@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <%# 학부모 청구 링크 공개 전용 레이아웃(F9) — 앱 셸(application.html.erb)과 분리:
+        헤더·하단탭·PWA 메타 없음, 검색엔진 색인 금지(PRD 8장 보안 요구) %>
+    <title><%= content_for(:title) || t("billing_links.meta.title") %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= yield :head %>
+
+    <%# Pretendard 웹폰트 — 앱 셸과 동일 체계(시스템 폰트 폴백, tailwind.config.js font-sans) %>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css" crossorigin>
+
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="min-h-dvh bg-canvas font-sans text-base leading-relaxed text-ink antialiased">
+    <%# 단일 컬럼·모바일 퍼스트 — 학부모는 알림톡 링크로 모바일에서 바로 연다(PRD 8장) %>
+    <main class="mx-auto w-full max-w-md px-4 pb-12 pt-8">
+      <%= yield %>
+    </main>
+  </body>
+</html>

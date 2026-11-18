@@ -3,7 +3,7 @@
 # 흐름: 생성(Generator) → 미리보기·확정(DRAFT→READY, INV-006) → 개별 조정(READY 이후 사유 필수,
 # INV-002) → 발송(즉시/예약, Dispatcher) → 결과(성공/실패·다시 보내기, MSG-001/007).
 class InvoicesController < ApplicationController
-  before_action :set_invoice, only: %i[edit update cancel resend]
+  before_action :set_invoice, only: %i[edit update cancel resend issue_link revoke_link]
   before_action :set_month, only: %i[index confirm results send_batch cancel_queue]
 
   def index
@@ -141,6 +141,33 @@ class InvoicesController < ApplicationController
       redirect_to results_invoices_path(month: @month),
                   alert: t("invoices.errors.queue_cancel_failed")
     end
+  end
+
+  # 학부모 청구 링크 발급 (W3 F9 — LNK-001/003). TokenService 단일 진입점(멱등 —
+  # 유효 토큰 보유 시 재사용). reissue 파라미터 시 기존 토큰 폐기 후 재발급.
+  # 취소(CANCELLED) 청구는 발급하지 않는다 — 서비스층 가드 + 선제 거부(LNK-003/INV-003).
+  def issue_link
+    if @invoice.CANCELLED?
+      redirect_to invoices_path(month: @invoice.target_month),
+                  alert: t("invoices.errors.link_not_issuable"), status: :see_other
+      return
+    end
+
+    if params[:reissue].present?
+      BillingLinks::TokenService.reissue_for(@invoice)
+      notice = t("invoices.notices.link_reissued")
+    else
+      BillingLinks::TokenService.issue_for(@invoice)
+      notice = t("invoices.notices.link_issued")
+    end
+    redirect_to invoices_path(month: @invoice.target_month), status: :see_other, notice:
+  end
+
+  # 학부모 청구 링크 폐기 (LNK-003 — 사유 불요, 확인 단계 후 호출·멱등)
+  def revoke_link
+    BillingLinks::TokenService.revoke_for(@invoice)
+    redirect_to invoices_path(month: @invoice.target_month), status: :see_other,
+                notice: t("invoices.notices.link_revoked")
   end
 
   private

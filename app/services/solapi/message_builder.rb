@@ -2,7 +2,8 @@
 
 module Solapi
   # F3 본문 템플릿 치환 (PRD 7장 F3 본문 구조: 원생명·청구월·금액·계좌·기한·원장상호·원장전화).
-  # W2 경계: 청구 링크(F9, W3) 없이 본문만으로 납부 정보 완결.
+  # W3: 학부모 청구 링크(F9) — 유효 토큰이 있는 청구만 본문 뒤에 링크 한 줄 추가
+  # (카카오 변수 '청구링크' + SMS 폴백 문구는 ko.yml messages.invoice_notice.billing_link_line).
   # - 알림톡: 카카오 사전등록 템플릿의 #{변수} 치환값만 전달(템플릿 코드는 운영 주입 파라미터)
   # - SMS/LMS 폴백: 본문 직접 생성 — 90바이트 초과 시 LMS(subject 부여)
   class MessageBuilder
@@ -56,7 +57,10 @@ module Solapi
         if reminder?
           reminder_text
         else
-          I18n.t("messages.invoice_notice.sms_text", **i18n_args).strip
+          base = I18n.t("messages.invoice_notice.sms_text", **i18n_args).strip
+          link = variables["청구링크"]
+          # F9: 유효 토큰이 있는 청구만 링크 줄 추가 — 없으면 기존 본문 그대로(W2 동작 유지)
+          link.present? ? "#{base}\n#{I18n.t("messages.invoice_notice.billing_link_line", url: link)}" : base
         end
     end
 
@@ -126,7 +130,27 @@ module Solapi
         "기한" => due_label,
         "원장상호" => @tenant.name.to_s,
         "원장전화" => tenant_owner_phone
-      }
+      }.merge(billing_link_variable)
+    end
+
+    # F9 청구 링크 변수 — 안내 알림톡(invoice_notice)에만. 유효(미폐기) 토큰이 있는
+    # 청구만 절대 URL, 없으면 빈 문자열(본문·변수 모두 기존 동작 유지).
+    # 토큰은 SecureRandom urlsafe이므로 URL에 개인정보가 직접 포함되지 않는다(LNK-001).
+    # 리마인더 샘플 청구(Reminders::SampleInvoice) 등 토큰 미보유 객체는 안전히 생략.
+    def billing_link_variable
+      return {} if reminder?
+      return {} unless @invoice.respond_to?(:public_token)
+
+      token = @invoice.public_token
+      return {} if token.blank? || @invoice.public_token_revoked_at.present?
+
+      { "청구링크" => Rails.application.routes.url_helpers.billing_link_url(token, **app_url_options) }
+    end
+
+    # 요청 밖(Job·Service) URL 생성용 호스트 — routes 기본값, 없으면 mailer 기본값 사용.
+    def app_url_options
+      Rails.application.routes.default_url_options.presence ||
+        Rails.application.config.action_mailer.default_url_options
     end
 
     def month_label

@@ -1,0 +1,15 @@
+<%# F9 링크 만료·폐기 안내(LNK-003) — 청구 정보 일절 미표시, 원장 문의 안내만.
+    토큰으로 청구를 특정할 수 없으므로 교습소 정보(전화 등)도 노출하지 않는다. %>
+<article class="rounded-2xl border border-line bg-surface p-6 text-center">
+  <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-warning-50" aria-hidden="true">
+    <svg class="h-7 w-7 text-warning-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18.2 10.2a6.2 6.2 0 1 0-12.4 0c0 4.6-1.6 5.8-1.6 5.8h15.6s-1.6-1.2-1.6-5.8z"/>
+      <path d="M10 19.4a2.1 2.1 0 0 0 4 0"/>
+    </svg>
+  </div>
+  <h1 class="mt-4 text-lg font-extrabold text-ink"><%= t("billing_links.expired.title") %></h1>
+  <p class="mt-2 text-sm leading-relaxed text-muted"><%= t("billing_links.expired.description") %></p>
+  <%# 문의 방법은 청구 안내 알림톡의 발신 대화 또는 원장께서 안내한 연락처로 —
+      이 페이지는 청구와 무관한 접근도 구분 없이 같은 안내를 보여야 하므로 정보를 특정하지 않는다(LNK-002·003). %>
+  <p class="mt-4 text-sm font-semibold text-ink"><%= t("billing_links.expired.contact_hint") %></p>
+</article>

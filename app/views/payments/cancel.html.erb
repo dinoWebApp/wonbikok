@@ -1,0 +1,36 @@
+<%= render "shared/page_header", title: t("payments.cancel.title") %>
+
+<%= render layout: "shared/card", locals: { class: "p-5" } do %>
+  <div class="flex items-baseline justify-between gap-4 border-b border-line pb-4 text-sm">
+    <p class="min-w-0 font-semibold text-ink"><%= @payment.invoice.student_name_snapshot %></p>
+    <%= render "shared/badge", tone: :neutral, text: t("payments.status.active") %>
+  </div>
+  <div class="flex items-baseline justify-between gap-4 py-4 text-sm">
+    <p class="text-muted"><%= @payment.paid_on.strftime("%Y-%m-%d") %> · <%= t("payments.method.#{@payment.method}") %></p>
+    <%# 금액: 오른쪽 정렬 + tabular-nums (PRD 16.1) %>
+    <p class="text-base font-bold tabular-nums text-ink"><%= number_with_delimiter(@payment.amount) %><%= t("payments.won") %></p>
+  </div>
+  <% if @payment.memo.present? %>
+    <p class="border-t border-line pb-4 text-sm text-muted"><%= @payment.memo %></p>
+  <% end %>
+
+  <%= form_with url: cancel_payment_payment_path(@payment), class: "mt-1 space-y-3" do %>
+    <div>
+      <div class="mb-1.5 flex items-baseline justify-between gap-2">
+        <%= label_tag :cancel_reason, t("payments.cancel.reason"), class: "text-sm font-semibold text-ink" %>
+        <span class="text-xs font-semibold text-danger-600">(<%= t("common.required") %>)</span>
+      </div>
+      <%= text_field_tag :cancel_reason, nil, required: true, class: "field-input" %>
+      <p class="mt-1.5 text-xs leading-relaxed text-muted"><%= t("payments.cancel.notice") %></p>
+    </div>
+    <%# 오체크 취소 — 되돌릴 수 없는 작업: 확인 단계 필수 (PRD 15.4). 이력은 삭제되지 않는다(PAY-002) %>
+    <%= submit_tag t("payments.cancel.submit"),
+          data: { turbo_confirm: t("payments.cancel.confirm") },
+          class: "btn-destructive btn-lg w-full" %>
+  <% end %>
+<% end %>
+
+<div class="mt-4">
+  <%= render "shared/button", label: t("common.back"),
+        url: payments_path(month: @payment.invoice.target_month), variant: :secondary, class: "w-full" %>
+</div>

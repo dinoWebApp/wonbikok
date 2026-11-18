@@ -1,0 +1,122 @@
+<%# F9 학부모 청구 페이지(PRD 8장) — 정보 위계: 금액(큰 글씨) > 계좌 복사(최우선 액션)
+    > 내역·기한·상태 > 현금영수증 안내 > 문의(3초 계좌 복사·5초 전화 목표).
+    표시 데이터는 컨트롤러 화이트리스트 @billing(LNK-002)만. 온라인 결제 버튼 없음(LNK-005). %>
+<article class="space-y-4">
+  <%# 발신·대상 컨텍스트 — 교습소명·원생명(마스킹 TEN-003)·청구월 %>
+  <header class="rounded-2xl border border-line bg-surface p-5">
+    <p class="text-base font-extrabold text-ink"><%= @billing.academy_name %></p>
+    <p class="mt-0.5 text-xs font-semibold text-muted"><%= t("billing_links.show.context_label") %></p>
+    <dl class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+      <div class="flex items-center gap-1.5">
+        <dt class="text-muted"><%= t("billing_links.show.student_label") %></dt>
+        <dd class="font-semibold text-ink"><%= @billing.student_name %></dd>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <dt class="text-muted"><%= t("billing_links.show.month_label") %></dt>
+        <dd class="font-semibold tabular-nums text-ink"><%= Date.strptime(@billing.billing_month, "%Y-%m").strftime("%Y년 %-m월") %></dd>
+      </div>
+    </dl>
+  </header>
+
+  <%# 금액 — 최상위 위계, 큰 글씨(PRD 8장) %>
+  <section class="rounded-2xl bg-brand-50 p-6 text-center" aria-labelledby="billing_total_label">
+    <p id="billing_total_label" class="text-sm font-semibold text-brand-700"><%= t("billing_links.show.total_label") %></p>
+    <p class="mt-2 text-4xl font-extrabold leading-tight tabular-nums text-ink">
+      <%= number_with_delimiter(@billing.total_amount) %><span class="ml-1 text-xl font-bold"><%= t("billing_links.won") %></span>
+    </p>
+  </section>
+
+  <%# 계좌 복사 — 이 페이지의 최우선 액션: 원탭 복사 + 완료 토스트(PRD 8장) %>
+  <% if @billing.bank_account.present? %>
+    <section data-controller="clipboard"
+             data-clipboard-text-value="<%= @billing.bank_account %>"
+             data-clipboard-success-message-value="<%= t("billing_links.show.copy_success") %>"
+             data-clipboard-fallback-message-value="<%= t("billing_links.show.copy_fallback") %>"
+             class="rounded-2xl border border-line bg-surface p-5">
+      <h2 class="text-sm font-bold text-ink"><%= t("billing_links.show.account_title") %></h2>
+      <div class="mt-3 rounded-xl bg-canvas px-4 py-3">
+        <p class="text-sm text-muted">
+          <%= @billing.bank_name.presence || t("billing_links.show.bank_unknown") %>
+          <% if @billing.account_holder.present? %> · <%= @billing.account_holder %><% end %>
+        </p>
+        <p data-clipboard-target="display" class="mt-0.5 text-lg font-bold tabular-nums select-all text-ink"><%= @billing.bank_account %></p>
+      </div>
+      <button type="button" data-action="clipboard#copy"
+              class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 text-base font-bold text-white hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+        <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="8.5" y="8.5" width="11" height="11" rx="2"/>
+          <path d="M5.5 15.5h-1a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"/>
+        </svg>
+        <%= t("billing_links.show.copy_account") %>
+      </button>
+      <%# 복사 결과 토스트 — aria-live로 스크린리더에도 안내(문구는 data 속성 경유 i18n) %>
+      <p data-clipboard-target="toast" aria-live="polite" role="status"
+         class="mt-3 hidden rounded-lg bg-success-50 px-3 py-2 text-center text-sm font-semibold text-success-700"></p>
+    </section>
+  <% else %>
+    <%# 계좌 미등록 원장 — 문의 유도 폴백(빈 카드 노출 방지) %>
+    <section class="rounded-2xl border border-line bg-surface p-5">
+      <p class="text-sm leading-relaxed text-muted"><%= t("billing_links.show.account_missing") %></p>
+    </section>
+  <% end %>
+
+  <%# 내역 · 기한 · 납부 상태 %>
+  <section class="rounded-2xl border border-line bg-surface p-5">
+    <h2 class="text-sm font-bold text-ink"><%= t("billing_links.show.detail_title") %></h2>
+    <dl class="mt-3 space-y-2 text-sm">
+      <div class="flex items-baseline justify-between gap-3">
+        <dt class="text-muted"><%= t("billing_links.show.base_amount") %></dt>
+        <dd class="font-medium tabular-nums text-ink"><%= number_with_delimiter(@billing.base_amount) %><%= t("billing_links.won") %></dd>
+      </div>
+      <% if @billing.adjustment_amount != 0 %>
+        <div class="flex items-baseline justify-between gap-3">
+          <dt class="min-w-0 text-muted">
+            <%= t("billing_links.show.adjustment_amount") %><% if @billing.adjustment_note.present? %> (<%= @billing.adjustment_note %>)<% end %>
+          </dt>
+          <dd class="shrink-0 font-medium tabular-nums text-ink">
+            <%= @billing.adjustment_amount.positive? ? "+" : "" %><%= number_with_delimiter(@billing.adjustment_amount) %><%= t("billing_links.won") %>
+          </dd>
+        </div>
+      <% end %>
+      <div class="flex items-baseline justify-between gap-3 border-t border-line pt-2">
+        <dt class="font-semibold text-ink"><%= t("billing_links.show.due_on") %></dt>
+        <dd class="font-semibold tabular-nums text-ink"><%= @billing.due_on&.strftime("%Y. %-m. %-d") || t("billing_links.show.due_on_none") %></dd>
+      </div>
+    </dl>
+    <%# 납부 상태 — invoice.status 기반 3값(납부 전/확인 중/납부 완료) %>
+    <div class="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
+      <h3 class="text-sm font-bold text-ink"><%= t("billing_links.show.status_title") %></h3>
+      <% state_tone = { pending: "border-warning-200 bg-warning-50 text-warning-700",
+                        confirming: "border-brand-200 bg-brand-50 text-brand-700",
+                        paid: "border-success-200 bg-success-50 text-success-700" }.fetch(@billing.payment_state) %>
+      <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-full border <%= state_tone %> px-2.5 py-1 text-xs font-semibold">
+        <span class="h-1.5 w-1.5 rounded-full bg-current opacity-70" aria-hidden="true"></span>
+        <%= t("billing_links.show.payment_state.#{@billing.payment_state}") %>
+      </span>
+    </div>
+  </section>
+
+  <%# 현금영수증 자동발급 안내 (PRD 8장 표시 항목) %>
+  <section class="flex items-start gap-2.5 rounded-2xl border border-line bg-surface p-4">
+    <svg class="mt-0.5 h-5 w-5 shrink-0 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6.5 3.5h11a1 1 0 0 1 1 1v16l-3.25-2.2-3.25 2.2-3.25-2.2L5 20.5v-16a1 1 0 0 1 1-1z"/>
+      <path d="M9.2 8.5h5.6M9.2 12h5.6"/>
+    </svg>
+    <p class="text-sm leading-relaxed text-muted"><%= t("billing_links.show.cash_receipt_notice") %></p>
+  </section>
+
+  <%# 문의 — 원장 전화 원터치 발신(PRD 8장 5초 목표) %>
+  <% if @billing.contact_phone.present? %>
+    <section class="rounded-2xl border border-line bg-surface p-5">
+      <h2 class="text-sm font-bold text-ink"><%= t("billing_links.show.contact_title") %></h2>
+      <p class="mt-1 text-sm text-muted"><%= t("billing_links.show.contact_hint") %></p>
+      <%= link_to "tel:#{@billing.contact_phone}",
+            class: "mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line bg-canvas px-4 text-base font-bold text-brand-700 hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600" do %>
+        <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5.5 4.5h3l1.5 4-2 1.5a12.5 12.5 0 0 0 6 6l1.5-2 4 1.5v3a1.5 1.5 0 0 1-1.6 1.5C9.6 19.6 4.4 14.4 4 6.1a1.5 1.5 0 0 1 1.5-1.6z"/>
+        </svg>
+        <%= t("billing_links.show.call") %>
+      <% end %>
+    </section>
+  <% end %>
+</article>

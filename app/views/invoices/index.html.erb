@@ -94,7 +94,9 @@
           <span class="truncate"><%= invoice.student_name_snapshot %></span> <%# TEN-004 스냅샷 %>
         </p>
         <% invoice_tone = { "DRAFT" => :neutral, "READY" => :info, "SENT" => :success,
-                            "UNPAID" => :warning, "OVERDUE" => :warning, "CANCELLED" => :neutral }.fetch(invoice.status, :neutral) %>
+                            "UNPAID" => :warning, "OVERDUE" => :warning,
+                            "PARTIALLY_PAID" => :warning, "PAID" => :success,
+                            "CANCELLED" => :neutral }.fetch(invoice.status, :neutral) %>
         <%= render "shared/badge", tone: invoice_tone, text: t("invoices.status.#{invoice.status}") %>
       </div>
       <div class="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
@@ -110,14 +112,73 @@
           <% end %>
         </span>
       </div>
-      <div class="mt-3 flex gap-2 border-t border-line pt-3">
-        <%= render "shared/button", label: t("common.edit"), url: edit_invoice_path(invoice),
-              variant: :secondary, class: "flex-1" %>
-        <% unless invoice.CANCELLED? %>
-          <%= render "shared/button", label: t("invoices.cancel_action"), url: cancel_invoice_path(invoice),
-                variant: :destructive_secondary, class: "flex-1" %>
-        <% end %>
-      </div>
+      <%# 액션 위계 — 주 액션(입금 확인) 전폭 버튼, 부가 액션(수정·취소·링크)은 "더보기" 접기
+          (F4·F9 진입 결선 — 카드 과밀 방지). %>
+      <% payment_entryable = invoice.status.in?(%w[READY SENT UNPAID OVERDUE PARTIALLY_PAID]) %>
+      <% editable = invoice.DRAFT? || invoice.READY? %>
+      <% cancellable = invoice.cancellable? %>
+      <% link_manageable = !invoice.CANCELLED? || invoice.active_public_token? %>
+      <% if payment_entryable || editable || cancellable || link_manageable %>
+        <div class="mt-3 space-y-2 border-t border-line pt-3">
+          <% if payment_entryable %>
+            <%# F4 입금 확인 진입 — 미완납 확정 청구만(초안·취소·완납 제외) %>
+            <%= render "shared/button", label: t("invoices.actions.payment_entry"),
+                  url: new_payment_path(invoice_id: invoice.id), class: "w-full" %>
+          <% end %>
+          <% if editable || cancellable || link_manageable %>
+            <details class="group">
+              <summary class="btn-secondary flex min-h-11 w-full cursor-pointer list-none select-none
+                              items-center justify-center px-3 text-sm
+                              [&::-webkit-details-marker]:hidden">
+                <%= t("invoices.actions.more") %>
+              </summary>
+              <div class="mt-2 space-y-2 rounded-xl border border-line bg-canvas p-3">
+                <% if editable %>
+                  <%= render "shared/button", label: t("common.edit"), url: edit_invoice_path(invoice),
+                        variant: :secondary, class: "w-full" %>
+                <% end %>
+                <% if cancellable %>
+                  <%= render "shared/button", label: t("invoices.cancel_action"), url: cancel_invoice_path(invoice),
+                        variant: :destructive_secondary, class: "w-full" %>
+                <% end %>
+                <% if link_manageable %>
+                  <%# F9 학부모 청구 링크 관리 — 발급(멱등)·복사·재발급·폐기(LNK-003) %>
+                  <div class="border-t border-line pt-2">
+                    <p class="mb-2 text-xs font-semibold text-muted"><%= t("invoices.link.title") %></p>
+                    <% if invoice.active_public_token? %>
+                      <div data-controller="clipboard"
+                           data-clipboard-text-value="<%= billing_link_url(invoice.public_token) %>"
+                           data-clipboard-success-message-value="<%= t("invoices.link.copy_success") %>"
+                           data-clipboard-fallback-message-value="<%= t("invoices.link.copy_fallback") %>"
+                           class="space-y-2">
+                        <div class="flex gap-2">
+                          <%= render "shared/button", label: t("invoices.link.copy"),
+                                variant: :secondary, type: "button",
+                                data: { action: "clipboard#copy" }, class: "flex-1" %>
+                          <%= render "shared/button", label: t("invoices.link.reissue"),
+                                variant: :secondary, url: issue_link_invoice_path(invoice, reissue: "1"),
+                                method: :post, data: { turbo_confirm: t("invoices.link.reissue_confirm") },
+                                class: "flex-1" %>
+                        </div>
+                        <p data-clipboard-target="toast" aria-live="polite" role="status"
+                           class="hidden rounded-lg bg-success-50 px-3 py-2 text-center text-xs font-semibold text-success-700"></p>
+                        <%= render "shared/button", label: t("invoices.link.revoke"),
+                              variant: :destructive_secondary, url: revoke_link_invoice_path(invoice),
+                              method: :post, data: { turbo_confirm: t("invoices.link.revoke_confirm") },
+                              class: "w-full" %>
+                      </div>
+                    <% else %>
+                      <%= render "shared/button", label: t("invoices.link.issue"),
+                            variant: :secondary, url: issue_link_invoice_path(invoice),
+                            method: :post, class: "w-full" %>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+            </details>
+          <% end %>
+        </div>
+      <% end %>
     </div>
   <% end %>
 </div>

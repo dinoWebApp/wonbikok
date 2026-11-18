@@ -1,0 +1,115 @@
+<%= render layout: "shared/page_header", locals: { title: t("payments.index.title"),
+      description: t("payments.index.subtitle") } do %>
+  <%# 월 필터 — 기본 당월 %>
+  <%= form_with url: payments_path, method: :get, class: "flex items-center gap-2" do %>
+    <%= month_field_tag :month, @month, class: "field-input px-3", "aria-label": t("payments.index.month_filter") %>
+    <%= submit_tag t("payments.index.filter"), class: "btn-secondary shrink-0 px-3 text-xs" %>
+  <% end %>
+<% end %>
+
+<%# 미확인 리스트 섹션 제목 — 수납 이력 섹션과 구분 %>
+<h2 class="mt-4 text-sm font-bold text-ink"><%= t("payments.index.unpaid_title") %></h2>
+
+<% if @unpaid_rows.empty? %>
+  <%# 빈 상태 — 다음 액션 안내 필수 (PRD 15.4) %>
+  <%= render "shared/empty_state", title: t("payments.index.empty"),
+        description: t("payments.index.empty_description"),
+        cta_label: t("payments.index.empty_cta"), cta_url: invoices_path(month: @month) %>
+<% else %>
+  <div class="space-y-3">
+    <% @unpaid_rows.each do |row| %>
+      <%# 상태 배지 — 16.2 (색+텍스트 병행): PARTIALLY_PAID=warning, OVERDUE=warning %>
+      <% badge_tone = { "PARTIALLY_PAID" => :warning, "OVERDUE" => :warning, "SENT" => :info,
+                        "READY" => :neutral, "UNPAID" => :neutral }.fetch(row.invoice.status, :neutral) %>
+      <div class="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="truncate font-bold text-ink"><%= row.invoice.student_name_snapshot %></p>
+            <% if row.invoice.due_on.present? %>
+              <p class="mt-0.5 text-xs text-muted"><%= t("payments.index.due", date: row.invoice.due_on.strftime("%m.%d")) %></p>
+            <% end %>
+          </div>
+          <%= render "shared/badge", tone: badge_tone, text: t("invoices.status.#{row.invoice.status}") %>
+        </div>
+        <div class="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-sm">
+          <div>
+            <p class="text-xs text-muted"><%= t("payments.index.label_total") %></p>
+            <p class="font-semibold tabular-nums text-ink"><%= number_with_delimiter(row.invoice.total_amount) %><%= t("payments.won") %></p>
+          </div>
+          <div>
+            <p class="text-xs text-muted"><%= t("payments.index.label_paid") %></p>
+            <p class="font-semibold tabular-nums text-ink"><%= number_with_delimiter(row.paid_total) %><%= t("payments.won") %></p>
+          </div>
+          <div>
+            <p class="text-xs text-muted"><%= t("payments.index.label_remaining") %></p>
+            <p class="font-bold tabular-nums text-brand-700"><%= number_with_delimiter(row.remaining_amount) %><%= t("payments.won") %></p>
+          </div>
+        </div>
+        <%# 부분납 — 등록된 수납 내역 접기 + 오체크 취소 진입 (PAY-002) %>
+        <% if row.payments.present? %>
+          <details class="mt-2">
+            <summary class="flex min-h-11 w-full cursor-pointer list-none select-none items-center justify-center
+                            rounded-lg border border-line bg-canvas px-3 text-xs font-semibold text-muted
+                            [&::-webkit-details-marker]:hidden">
+              <%= t("payments.index.payments_count", count: row.payments.size) %>
+            </summary>
+            <ul class="mt-2 space-y-2">
+              <% row.payments.each do |payment| %>
+                <li class="flex items-center justify-between gap-2 rounded-lg border border-line bg-canvas px-3 py-2 text-sm">
+                  <span class="min-w-0 text-xs text-muted">
+                    <span class="font-semibold tabular-nums text-ink"><%= number_with_delimiter(payment.amount) %><%= t("payments.won") %></span>
+                    · <%= payment.paid_on.strftime("%-m/%-d") %> · <%= t("payments.method.#{payment.method}") %>
+                  </span>
+                  <%= render "shared/button", label: t("payments.index.cancel_entry"),
+                        url: cancel_payment_path(payment), variant: :destructive_secondary,
+                        class: "shrink-0 px-3 text-xs" %>
+                </li>
+              <% end %>
+            </ul>
+          </details>
+        <% end %>
+        <%# 체크 처리 진입 — 리스트 → 등록 폼 제출 2탭 목표(F4 수용조건) %>
+        <div class="mt-3">
+          <%= render "shared/button", label: t("payments.index.confirm_button"),
+                url: new_payment_path(invoice_id: row.invoice.id), class: "w-full" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# 수납 이력 (PAY-002) — 완납 포함 확정 청구의 active 수납 행 + 오체크 취소 진입.
+    완납(PAID) 건은 위 미확인 리스트에서 사라지므로 취소 진입은 이 섹션에서 제공된다. %>
+<%= render layout: "shared/card", locals: { class: "mt-4 p-5" } do %>
+  <h2 class="text-sm font-bold text-ink"><%= t("payments.index.history_title") %></h2>
+  <% if @payment_history.empty? %>
+    <p class="mt-3 text-sm text-muted"><%= t("payments.index.history_empty") %></p>
+  <% else %>
+    <div class="mt-3 space-y-3">
+      <% @payment_history.each do |row| %>
+        <% history_tone = { "PAID" => :success, "PARTIALLY_PAID" => :warning, "OVERDUE" => :warning,
+                            "SENT" => :info, "READY" => :neutral, "UNPAID" => :neutral }.fetch(row.invoice.status, :neutral) %>
+        <div class="rounded-xl border border-line bg-canvas p-3">
+          <div class="flex items-center justify-between gap-2">
+            <p class="min-w-0 truncate text-sm font-semibold text-ink"><%= row.invoice.student_name_snapshot %></p>
+            <%= render "shared/badge", tone: history_tone, text: t("invoices.status.#{row.invoice.status}") %>
+          </div>
+          <ul class="mt-2 space-y-2">
+            <% row.payments.each do |payment| %>
+              <li class="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface px-3 py-2">
+                <span class="min-w-0 text-sm text-muted">
+                  <span class="font-semibold tabular-nums text-ink"><%= number_with_delimiter(payment.amount) %><%= t("payments.won") %></span>
+                  · <%= payment.paid_on.strftime("%Y-%m-%d") %> · <%= t("payments.method.#{payment.method}") %>
+                  <% if payment.confirmed_by.present? %> · <%= t("payments.index.label_operator") %> <%= payment.confirmed_by %><% end %>
+                </span>
+                <%= render "shared/button", label: t("payments.index.cancel_entry"),
+                      url: cancel_payment_path(payment), variant: :destructive_secondary,
+                      class: "shrink-0 px-3 text-xs" %>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

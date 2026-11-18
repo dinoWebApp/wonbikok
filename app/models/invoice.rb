@@ -21,6 +21,8 @@ class Invoice < ApplicationRecord
   belongs_to :tenant
   belongs_to :student
   has_many :message_logs, dependent: :destroy
+  # 수납 이력(PAY-002) — 청구 삭제 시에도 이력 보존(DB FK restrict, dependent 없음)
+  has_many :payments
 
   validates :target_month, presence: true, format: { with: /\A\d{4}-(0[1-9]|1[0-2])\z/, message: :invalid_month }
   validates :student_name_snapshot, presence: true
@@ -32,11 +34,12 @@ class Invoice < ApplicationRecord
   scope :billable, -> { where.not(status: :CANCELLED) } # INV-003: 취소 청구는 수납 합계 제외
   scope :sendable, -> { where(status: :READY) }
 
-  # F6 리마인더 대상(W2 임시 규칙 — PRD 14장): SENT/UNPAID/OVERDUE & 기한 경과 & 완납 기록 없음
-  # (Payment 도입 W3에서 확장) & 취소 제외(INV-003) & 리마인더 제외 원생 배제(MSG-004).
+  # F6 리마인더 대상(W3 확장 — PRD 14장 F4/F9 확정 사항): SENT/UNPAID/OVERDUE/PARTIALLY_PAID
+  # & 기한 경과 & 취소 제외(INV-003) & 리마인더 제외 원생 배제(MSG-004).
+  # PARTIALLY_PAID는 잔액이 미납으로 남아 리마인더 대상(PRD F4). PAID(완납)는 제외.
   # 경과일·단계 판정은 Reminders::Scheduler가 담당.
   scope :remindable, -> {
-    where(status: [ :SENT, :UNPAID, :OVERDUE ])
+    where(status: [ :SENT, :UNPAID, :OVERDUE, :PARTIALLY_PAID ])
       .where.not(due_on: nil)
       .joins(:student)
       .where(students: { excluded_from_reminders: false })
@@ -66,6 +69,7 @@ class Invoice < ApplicationRecord
 
   # 청구 취소(INV-003): 사유 필수, 수납 합계에서 제외.
   # 예약 발송 대기(QUEUED) 중인 안내는 연쇄 취소 — 취소 청구 발송 차단(9.1).
+  # 학부모 청구 링크 즉시 폐기(LNK-003 — 취소 청구 공개 페이지 차단, 멱등).
   def cancel!(reason)
     if reason.to_s.strip.blank?
       errors.add(:cancel_reason, :blank)
@@ -75,6 +79,7 @@ class Invoice < ApplicationRecord
 
     transaction do
       update!(status: :CANCELLED, cancelled_at: Time.current, cancel_reason: reason.strip)
+      BillingLinks::TokenService.revoke_for(self)
       message_logs.QUEUED.find_each do |log|
         SolidQueue::Job.where(active_job_id: log.job_id).find_each(&:discard) if log.job_id.present?
         log.update!(status: :FAILED, error_code: "INVOICE_CANCELLED",
@@ -126,6 +131,12 @@ class Invoice < ApplicationRecord
     JSON.parse(change_history)
   rescue JSON::ParserError
     []
+  end
+
+  # F9 학부모 청구 링크 — 유효(미폐기) 토큰 보유 여부. 발급·재발급·폐기는
+  # BillingLinks::TokenService 경유만(단일 진입점 — LNK-001/003).
+  def active_public_token?
+    public_token.present? && public_token_revoked_at.nil?
   end
 
   private
