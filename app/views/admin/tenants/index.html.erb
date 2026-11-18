@@ -1,0 +1,63 @@
+<% content_for :title, t("admin.tenants.index.title") %>
+
+<div class="flex flex-wrap items-baseline justify-between gap-2">
+  <h1 class="text-xl font-extrabold tracking-tight"><%= t("admin.tenants.index.title") %></h1>
+  <p class="text-xs text-muted"><%= t("admin.tenants.index.search_scope") %></p>
+</div>
+
+<%# 통합 검색 — 상호·사업자번호·ID(v1.0 — 전화번호 검색은 암호화 저장으로 후속) %>
+<%= form_with url: admin_tenants_path, method: :get, class: "mt-4 flex gap-2" do |form| %>
+  <%= form.text_field :q, value: @query, placeholder: t("admin.tenants.index.search_placeholder"),
+        class: "w-full max-w-md rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" %>
+  <%= form.submit t("admin.tenants.index.search"),
+        class: "rounded-lg bg-brand-600 px-4 py-2 text-sm font-bold text-white hover:bg-brand-700" %>
+<% end %>
+
+<% if @rows.empty? %>
+  <div class="mt-8 rounded-xl border border-line bg-surface p-10 text-center">
+    <p class="text-sm font-semibold text-muted">
+      <%= @query.present? ? t("admin.tenants.index.no_results", query: @query) : t("admin.tenants.index.empty") %>
+    </p>
+  </div>
+<% else %>
+  <div class="mt-4 overflow-x-auto rounded-xl border border-line bg-surface">
+    <table class="w-full min-w-[52rem] text-sm">
+      <thead>
+        <tr class="border-b border-line text-left text-xs font-semibold text-muted">
+          <th class="px-4 py-2.5"><%= t("admin.tenants.index.col_id") %></th>
+          <th class="px-4 py-2.5"><%= t("admin.tenants.index.col_name") %></th>
+          <th class="px-4 py-2.5"><%= t("admin.tenants.index.col_owner") %></th>
+          <th class="px-4 py-2.5"><%= t("admin.tenants.index.col_business_number") %></th>
+          <th class="px-4 py-2.5"><%= t("admin.tenants.index.col_phone") %></th>
+          <th class="px-4 py-2.5"><%= t("admin.tenants.index.col_plan") %></th>
+          <th class="px-4 py-2.5"><%= t("admin.tenants.index.col_students") %></th>
+          <th class="px-4 py-2.5"><%= t("admin.tenants.index.col_joined") %></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @rows.each do |row| %>
+          <tr class="border-b border-line last:border-b-0 hover:bg-canvas">
+            <td class="px-4 py-2.5 font-mono text-xs text-muted"><%= row.tenant.id %></td>
+            <td class="px-4 py-2.5 font-semibold">
+              <%= link_to row.tenant.name, admin_tenant_path(row.tenant), class: "text-brand-700 hover:underline" %>
+            </td>
+            <td class="px-4 py-2.5"><%= row.masked_owner_name %></td>
+            <td class="px-4 py-2.5"><%= row.masked_business_number %></td>
+            <td class="px-4 py-2.5"><%= row.masked_owner_phone %></td>
+            <td class="px-4 py-2.5">
+              <% if row.subscription %>
+                <span class="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700"><%= t("admin.subscription_statuses.plan.#{row.subscription.plan}") %></span>
+                <span class="ml-1 rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-muted"><%= t("admin.subscription_statuses.status.#{row.subscription.status}") %></span>
+              <% else %>
+                <span class="text-xs text-muted"><%= t("admin.tenants.index.no_subscription") %></span>
+              <% end %>
+            </td>
+            <td class="px-4 py-2.5"><%= number_with_delimiter(row.students_count) %></td>
+            <td class="px-4 py-2.5 text-muted"><%= l(row.tenant.created_at.to_date, format: :default) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-2 text-xs text-muted"><%= t("admin.tenants.index.mask_notice") %></p>
+<% end %>

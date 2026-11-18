@@ -17,6 +17,8 @@ class Tenant < ApplicationRecord
   has_many :invoices, dependent: :destroy
   has_many :message_logs, dependent: :destroy
   has_many :cash_receipts, dependent: :destroy
+  # 구독(W4 F8) — Tenant 1:1(tenant_id 유니크). 생성은 Subscriptions::TrialService 경유만.
+  has_one :subscription, dependent: :destroy
 
   # 리마인더 설정(F6) — 문구 톤 3종(부드러움/표준/공식), 단계별 토글, 발송 시각
   REMINDER_TONES = %w[soft standard formal].freeze

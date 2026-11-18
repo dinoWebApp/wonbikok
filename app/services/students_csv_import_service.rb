@@ -10,9 +10,12 @@ class StudentsCsvImportService
 
   PAYMENT_DAY_RANGE = Student::PAYMENT_DAY_RANGE
 
-  def initialize(tenant:, upload:)
+  def initialize(tenant:, upload:, remaining_active_slots: nil)
     @tenant = tenant
     @upload = upload
+    # SUB-001(C-1): 재원(active) 행의 잔여 슬롯 — nil은 상한 없음(레거시 계정).
+    # 잔여 슬롯을 초과하는 재원 행은 오류행으로 처리한다(create 가드의 CSV 경로 대응).
+    @remaining_active_slots = remaining_active_slots
   end
 
   def call
@@ -26,7 +29,13 @@ class StudentsCsvImportService
     CSV.parse(text, headers: true, skip_blanks: true).each_with_index do |row, index|
       line = index + 2 # 헤더가 1행
       error = import_row(row, line, duplicate_finder)
-      error ? errors << error : success_count += 1
+      if error
+        errors << error
+      else
+        success_count += 1
+        # 등록된 재원(active) 행만 슬롯 소진 — 휴원·퇴원 행은 청구 대상 외(INV-004)
+        @remaining_active_slots -= 1 if !@remaining_active_slots.nil? && active_row?(row)
+      end
     end
 
     Result.new(success_count: success_count, errors: errors)
@@ -52,6 +61,15 @@ class StudentsCsvImportService
     values = StudentsCsvTemplateService::HEADERS.map { |header| row[header].to_s.strip }
     reasons = validate(values)
     return ImportError.new(line: line, row_values: values, reasons: reasons) if reasons.any?
+
+    # SUB-001(C-1): 재원 행이 잔여 슬롯을 초과하면 오류행 처리 — 플랜 상한 우회 차단.
+    # 휴원·퇴원 행은 상한 미산정(INV-004)이라 초과 판정 대상이 아니다.
+    if @remaining_active_slots&.zero? && active_row?(row)
+      return ImportError.new(
+        line: line, row_values: values,
+        reasons: [ I18n.t("students.import.errors.plan_limit_exceeded", remaining: @remaining_active_slots) ]
+      )
+    end
 
     # 수동 등록과 동일한 기준의 중복 검사(CRITICAL-1): 동일 보호자 전화·유사 이름
     conflicts = duplicate_finder.conflicts_with(name: values.first, phone_number: values.last)
@@ -90,6 +108,12 @@ class StudentsCsvImportService
       reasons << I18n.t("students.import.errors.phone")
     end
     reasons
+  end
+
+  # CSV 상태 컬럼이 재원(active)인 행 — SUB-001(C-1) 슬롯 소진·초과 판정용
+  def active_row?(row)
+    StudentsCsvTemplateService::STATUS_MAP.fetch(row[StudentsCsvTemplateService::HEADERS[5]].to_s.strip,
+                                                 nil) == "active"
   end
 
   def build_student(values)

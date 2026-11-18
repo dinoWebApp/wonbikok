@@ -22,6 +22,13 @@ class RegistrationsController < ApplicationController
     Tenant.transaction do
       @tenant.save!
       @user.save!
+      # F8: 30일 무료체험 자동 시작(멱등 — TrialService). 실패해도 가입은 차단하지 않는다(로그만).
+      begin
+        Subscriptions::TrialService.start_for!(@tenant)
+      rescue StandardError => e
+        Rails.logger.warn("[Registrations] trial start skipped tenant=#{@tenant.id} " \
+                          "error=#{e.class}: #{e.message}")
+      end
     end
     start_new_session_for(@user)
     redirect_to onboarding_step_path(2), status: :see_other, notice: t("registration.completed")

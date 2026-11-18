@@ -1,0 +1,24 @@
+<%# 이벤트 타임라인 (A2 — 가입→온보딩→결제→조치 전사정 단일 뷰) %>
+<ol class="relative ml-2 space-y-4 border-l border-line pl-6">
+  <% entries.each do |entry| %>
+    <li class="relative">
+      <span class="absolute -left-[1.72rem] top-1.5 inline-block h-2.5 w-2.5 rounded-full border-2 border-line bg-surface
+                   <%= entry.kind == :audit ? "border-brand-500 bg-brand-500" : "" %>
+                   <%= entry.kind == :subscription_event ? "border-warning-500 bg-warning-500" : "" %>"
+            aria-hidden="true"></span>
+      <p class="text-xs text-muted"><%= l(entry.occurred_at, format: :short) %></p>
+      <p class="text-sm font-semibold">
+        <%= t(entry.label_key, default: entry.label_key.split(".").last.tr("_", " ")) %>
+        <% if entry.amount.present? %>
+          <span class="font-normal text-muted">· <%= number_to_currency(entry.amount, unit: "₩", precision: 0) %></span>
+        <% end %>
+      </p>
+      <% if entry.note.present? %>
+        <p class="text-xs text-muted"><%= entry.note %></p>
+      <% end %>
+    </li>
+  <% end %>
+  <% if entries.empty? %>
+    <li><p class="text-sm text-muted"><%= t("admin.timeline.empty") %></p></li>
+  <% end %>
+</ol>

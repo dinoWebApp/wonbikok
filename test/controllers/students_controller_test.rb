@@ -255,6 +255,125 @@ class StudentsControllerTest < ActionDispatch::IntegrationTest
     assert_no_match "01011112222", response.body
   end
 
+  # == SUB-001: 플랜 원생 수 상한 초과 시 신규 등록 차단(W4 F8) ==
+  test "SUB-001 상한 도달 시 원생 등록은 422로 차단되고 기존 원생은 유지된다" do
+    @tenant.update!(onboarding_step: Tenant::ONBOARDING_FINAL_STEP)
+    subscription = Subscription.create!(
+      tenant: @tenant, plan: :light, status: :active, # light 상한 30명
+      trial_started_at: 40.days.ago, trial_ends_at: 10.days.ago,
+      current_period_start: 10.days.ago, current_period_end: 20.days.from_now
+    )
+    # setup 원생(@student) + fixture 재원 원생 포함 재원 30명 채우기
+    28.times do |i|
+      create_student_with_guardian(tenant: @tenant, name: "채움원생#{i}",
+                                   phone_number: format("0105555%04d", i))
+    end
+    assert_equal 30, @tenant.students.active.count
+
+    assert_no_difference "Student.count" do
+      post students_path, params: student_params(name: "초과원생", phone_number: "01088887777", confirm: "1")
+    end
+
+    assert_response :unprocessable_entity
+    assert_not_nil flash[:alert] # 상한 안내(문구 키는 3-S ko.yml 병합)
+    assert_equal 30, subscription.reload.tenant.students.active.count # 기존 원생 유지
+  end
+
+  test "SUB-001 휴원 원생은 상한 집계에서 제외된다(재원 기준)" do
+    @tenant.update!(onboarding_step: Tenant::ONBOARDING_FINAL_STEP)
+    Subscription.create!(
+      tenant: @tenant, plan: :light, status: :active,
+      trial_started_at: 40.days.ago, trial_ends_at: 10.days.ago,
+      current_period_start: 10.days.ago, current_period_end: 20.days.from_now
+    )
+    27.times do |i|
+      create_student_with_guardian(tenant: @tenant, name: "재원채움#{i}",
+                                   phone_number: format("0106666%04d", i))
+    end
+    paused = create_student_with_guardian(tenant: @tenant, name: "휴원원생",
+                                          phone_number: "01077770001")
+    paused.update!(status: :paused) # 재원 29 + 휴원 1 = 상한(30) 미도달
+    assert_equal 29, @tenant.students.active.count
+
+    assert_difference "Student.count", 1 do
+      post students_path, params: student_params(name: "신규원생", phone_number: "01088886666", confirm: "1")
+    end
+
+    assert_redirected_to students_path
+  end
+
+  test "SUB-001 상한 도달 시 CSV 등록은 422로 차단된다(C-1)" do
+    @tenant.update!(onboarding_step: Tenant::ONBOARDING_FINAL_STEP)
+    Subscription.create!(
+      tenant: @tenant, plan: :light, status: :active,
+      trial_started_at: 40.days.ago, trial_ends_at: 10.days.ago,
+      current_period_start: 10.days.ago, current_period_end: 20.days.from_now
+    )
+    28.times do |i| # setup 원생 + fixture 재원 원생 포함 30명 도달
+      create_student_with_guardian(tenant: @tenant, name: "채움원생#{i}",
+                                   phone_number: format("0105555%04d", i))
+    end
+
+    post import_students_path, params: { file: csv_upload(<<~CSV) }
+      원생명,학년,월 원비,납부일,납부유형,상태,보호자명,보호자 휴대폰번호
+      초과원생,초1,180000,15,계좌이체,재원,초과어머님,01088887777
+    CSV
+
+    assert_response :unprocessable_entity
+    assert_match "플랜 상한", response.body
+    assert_nil @tenant.students.reload.find_by(name: "초과원생")
+  end
+
+  test "SUB-001 잔여 1 슬롯에 2행 CSV는 1성공/1오류행 경계로 처리된다(C-1)" do
+    @tenant.update!(onboarding_step: Tenant::ONBOARDING_FINAL_STEP)
+    Subscription.create!(
+      tenant: @tenant, plan: :light, status: :active,
+      trial_started_at: 40.days.ago, trial_ends_at: 10.days.ago,
+      current_period_start: 10.days.ago, current_period_end: 20.days.from_now
+    )
+    27.times do |i| # 재원 29명 — 잔여 1
+      create_student_with_guardian(tenant: @tenant, name: "재원채움#{i}",
+                                   phone_number: format("0106666%04d", i))
+    end
+
+    post import_students_path, params: { file: csv_upload(<<~CSV) }
+      원생명,학년,월 원비,납부일,납부유형,상태,보호자명,보호자 휴대폰번호
+      마지막원생,초1,180000,15,계좌이체,재원,마지어머님,01055550001
+      초과원생,초2,190000,16,현금,재원,초과어머님,01055550002
+    CSV
+
+    assert_response :unprocessable_entity # 오류행 존재 시 결과 화면 422(기존 부분 실패 규약 — 정상행은 보존)
+    assert_equal 30, @tenant.students.active.count
+    assert_not_nil @tenant.students.find_by(name: "마지막원생")
+    assert_nil @tenant.students.find_by(name: "초과원생")
+    assert_match "플랜 원생 수 상한", response.body
+  end
+
+  test "SUB-001 구독이 없는 레거시 계정은 상한 없이 등록된다" do
+    assert_nil Subscription.find_by(tenant_id: @tenant.id)
+
+    assert_difference "Student.count", 1 do
+      post students_path, params: student_params(name: "레거시원생", phone_number: "01099990001", confirm: "1")
+    end
+
+    assert_redirected_to students_path
+  end
+
+  # C-1 회귀 고정: 레거시 계정(잔여 슬롯 nil)의 CSV 등록도 상한 검사 없이 통과한다
+  test "SUB-001 구독이 없는 레거시 계정의 CSV 등록은 상한 없이 처리된다" do
+    assert_nil Subscription.find_by(tenant_id: @tenant.id) # 잔여 슬롯 미산정 — 가드 비대상
+
+    assert_difference "Student.count", 1 do
+      post import_students_path, params: { file: csv_upload(<<~CSV) }
+        원생명,학년,월 원비,납부일,납부유형,상태,보호자명,보호자 휴대폰번호
+        레거시CSV원생,초1,180000,15,계좌이체,재원,레거시어머님,01099998888
+      CSV
+    end
+
+    assert_response :ok
+    assert_not_nil @tenant.students.reload.find_by(name: "레거시CSV원생")
+  end
+
   private
 
   def csv_upload(text)

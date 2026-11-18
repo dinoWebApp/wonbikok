@@ -23,6 +23,8 @@ class Invoice < ApplicationRecord
   has_many :message_logs, dependent: :destroy
   # 수납 이력(PAY-002) — 청구 삭제 시에도 이력 보존(DB FK restrict, dependent 없음)
   has_many :payments
+  # 발행 이력(CR-001·이력 5년 보관) — 역참조(원생별 이력 표시 등), dependent 없음(이력 보존)
+  has_many :cash_receipts
 
   validates :target_month, presence: true, format: { with: /\A\d{4}-(0[1-9]|1[0-2])\z/, message: :invalid_month }
   validates :student_name_snapshot, presence: true

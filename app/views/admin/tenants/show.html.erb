@@ -1,0 +1,192 @@
+<% content_for :title, t("admin.tenants.show.title", name: @tenant.name) %>
+
+<div class="flex flex-wrap items-baseline justify-between gap-2">
+  <h1 class="text-xl font-extrabold tracking-tight"><%= @tenant.name %></h1>
+  <p class="text-xs text-muted">
+    <%= t("admin.tenants.show.tenant_id", id: @tenant.id) %>
+    <% if @suspension_recorded %>
+      <span class="ml-2 rounded-full bg-danger-50 px-2 py-0.5 font-semibold text-danger-700"><%= t("admin.tenants.show.suspension_recorded") %></span>
+    <% end %>
+  </p>
+</div>
+<%= link_to t("admin.tenants.show.back_to_index"), admin_tenants_path, class: "mt-1 inline-block text-xs font-semibold text-brand-700 hover:underline" %>
+
+<div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+  <%# 기본 정보 — 개인정보 기본 마스킹(ADM-002·TEN-003) %>
+  <section class="rounded-xl border border-line bg-surface p-5">
+    <h2 class="text-sm font-bold text-muted"><%= t("admin.tenants.show.basic_info") %></h2>
+    <dl class="mt-3 space-y-2 text-sm">
+      <div class="flex justify-between gap-4">
+        <dt class="text-muted"><%= t("admin.tenants.show.owner_name") %></dt>
+        <dd class="font-semibold"><%= admin_mask_name(@tenant.owner_name) %></dd>
+      </div>
+      <% owner = @owner_users.first %>
+      <div class="flex justify-between gap-4">
+        <dt class="text-muted"><%= t("admin.tenants.show.owner_phone") %></dt>
+        <dd class="font-semibold"><%= admin_mask_phone(owner&.phone_number) %></dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-muted"><%= t("admin.tenants.show.business_number") %></dt>
+        <dd class="font-semibold"><%= admin_mask_business_number(@tenant.business_number) %></dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-muted"><%= t("admin.tenants.show.business_email") %></dt>
+        <dd class="font-semibold"><%= admin_mask_email(@tenant.email) %></dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-muted"><%= t("admin.tenants.show.joined_at") %></dt>
+        <dd><%= l(@tenant.created_at, format: :short) %></dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-muted"><%= t("admin.tenants.show.onboarding") %></dt>
+        <dd>
+          <% if @tenant.onboarding_complete? %>
+            <span class="rounded-full bg-success-50 px-2 py-0.5 text-xs font-semibold text-success-700"><%= t("admin.tenants.show.onboarding_done") %></span>
+          <% else %>
+            <span class="rounded-full bg-warning-50 px-2 py-0.5 text-xs font-semibold text-warning-700">
+              <%= t("admin.tenants.show.onboarding_step", step: @tenant.onboarding_step, final: Tenant::ONBOARDING_FINAL_STEP) %>
+            </span>
+          <% end %>
+        </dd>
+      </div>
+    </dl>
+  </section>
+
+  <%# 플랜·구독 상태 [3-S 결합 지점 — Subscription 가정(01_plan §2)] %>
+  <section class="rounded-xl border border-line bg-surface p-5">
+    <h2 class="text-sm font-bold text-muted"><%= t("admin.tenants.show.subscription") %></h2>
+    <% if @subscription %>
+      <dl class="mt-3 space-y-2 text-sm">
+        <div class="flex justify-between gap-4">
+          <dt class="text-muted"><%= t("admin.tenants.show.plan") %></dt>
+          <dd><span class="rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-700"><%= t("admin.subscription_statuses.plan.#{@subscription.plan}") %></span></dd>
+        </div>
+        <div class="flex justify-between gap-4">
+          <dt class="text-muted"><%= t("admin.tenants.show.subscription_status") %></dt>
+          <dd><span class="rounded-full bg-canvas px-2 py-0.5 font-semibold"><%= t("admin.subscription_statuses.status.#{@subscription.status}") %></span></dd>
+        </div>
+        <div class="flex justify-between gap-4">
+          <dt class="text-muted"><%= t("admin.tenants.show.trial_remain") %></dt>
+          <%# 체험 중일 때만 표시 — active 등 비체험 구독의 만료일 잔여(음수) 노출 방지 %>
+          <% if @subscription.trial? && @subscription.trial_remain_days %>
+            <dd class="font-semibold"><%= t("admin.tenants.show.trial_days", days: @subscription.trial_remain_days) %></dd>
+          <% else %>
+            <dd class="text-muted">-</dd>
+          <% end %>
+        </div>
+        <div class="flex justify-between gap-4">
+          <dt class="text-muted"><%= t("admin.tenants.show.students_limit") %></dt>
+          <dd class="font-semibold">
+            <%= number_with_delimiter(@students_count) %> / <%= @plan_limit.present? ? number_with_delimiter(@plan_limit) : "-" %>
+          </dd>
+        </div>
+        <div class="flex justify-between gap-4">
+          <dt class="text-muted"><%= t("admin.tenants.show.period") %></dt>
+          <dd class="text-xs">
+            <% if @subscription.current_period_start.present? && @subscription.current_period_end.present? %>
+              <%= l(@subscription.current_period_start.to_date, format: :default) %> ~ <%= l(@subscription.current_period_end.to_date, format: :default) %>
+            <% else %>
+              -
+            <% end %>
+          </dd>
+        </div>
+      </dl>
+    <% else %>
+      <p class="mt-3 text-sm text-muted"><%= t("admin.tenants.show.no_subscription") %></p>
+    <% end %>
+  </section>
+
+  <%# 마지막 활동·월간 요약 %>
+  <section class="rounded-xl border border-line bg-surface p-5">
+    <h2 class="text-sm font-bold text-muted"><%= t("admin.tenants.show.activity") %></h2>
+    <dl class="mt-3 space-y-2 text-sm">
+      <div class="flex justify-between gap-4">
+        <dt class="text-muted"><%= t("admin.tenants.show.last_login") %></dt>
+        <dd><%= @last_login_at ? l(@last_login_at, format: :short) : "-" %></dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-muted"><%= t("admin.tenants.show.last_message") %></dt>
+        <dd><%= @last_message_at ? l(@last_message_at, format: :short) : "-" %></dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-muted"><%= t("admin.tenants.show.last_receipt") %></dt>
+        <dd><%= @last_receipt_at ? l(@last_receipt_at, format: :short) : "-" %></dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-muted"><%= t("admin.tenants.show.month_summary") %></dt>
+        <dd class="text-xs">
+          <%= t("admin.tenants.show.month_messages", count: @month_message_count) %>
+          · <%= t("admin.tenants.show.month_receipts", count: @month_receipt_issued_count) %>
+        </dd>
+      </div>
+    </dl>
+    <p class="mt-3 text-xs text-muted"><%= t("admin.tenants.show.month_formula") %></p>
+  </section>
+
+  <%# 조치 — 파괴적 조치는 사유 없이 실행 불가(ADM-001) %>
+  <section class="rounded-xl border border-line bg-surface p-5">
+    <h2 class="text-sm font-bold text-muted"><%= t("admin.tenants.show.actions.title") %></h2>
+    <div class="mt-3 space-y-5">
+      <%# 플랜 수동 변경 %>
+      <%= form_with url: admin_tenant_change_plan_path(@tenant), method: :post, class: "space-y-2" do |form| %>
+        <p class="text-sm font-semibold"><%= t("admin.tenants.show.actions.change_plan") %></p>
+        <div class="flex gap-2">
+          <%= form.select :plan, [[t("admin.subscription_statuses.plan.light"), "light"], [t("admin.subscription_statuses.plan.standard"), "standard"]],
+                { selected: @subscription&.plan || "light" },
+                class: "w-36 rounded-lg border border-line bg-canvas px-3 py-2 text-sm" %>
+          <%= form.text_area :reason, rows: 1, required: true, placeholder: t("admin.actions.reason_placeholder"),
+                class: "min-w-0 flex-1 rounded-lg border border-line bg-canvas px-3 py-2 text-sm" %>
+        </div>
+        <%= form.submit t("admin.tenants.show.actions.change_plan"),
+              class: "rounded-lg bg-brand-600 px-4 py-2 text-sm font-bold text-white hover:bg-brand-700" %>
+      <% end %>
+
+      <%# 체험 연장 — 1회 최대 30일·누적 60일(A2) %>
+      <%= form_with url: admin_tenant_extend_trial_path(@tenant), method: :post, class: "space-y-2" do |form| %>
+        <p class="text-sm font-semibold">
+          <%= t("admin.tenants.show.actions.extend_trial") %>
+          <span class="ml-1 text-xs font-normal text-muted"><%= t("admin.tenants.show.actions.extend_trial_hint") %></span>
+        </p>
+        <div class="flex gap-2">
+          <%= form.number_field :days, min: 1, max: 30, required: true, placeholder: "30",
+                class: "w-24 rounded-lg border border-line bg-canvas px-3 py-2 text-sm" %>
+          <%= form.text_area :reason, rows: 1, required: true, placeholder: t("admin.actions.reason_placeholder"),
+                class: "min-w-0 flex-1 rounded-lg border border-line bg-canvas px-3 py-2 text-sm" %>
+        </div>
+        <%= form.submit t("admin.tenants.show.actions.extend_trial"),
+              class: "rounded-lg bg-brand-600 px-4 py-2 text-sm font-bold text-white hover:bg-brand-700" %>
+      <% end %>
+
+      <%# 계정 정지/해제 — v1.0 이력 기록만(실차단 후속) %>
+      <% if @suspension_recorded %>
+        <%= form_with url: admin_tenant_resume_path(@tenant), method: :post, class: "space-y-2" do |form| %>
+          <p class="text-sm font-semibold"><%= t("admin.tenants.show.actions.resume") %></p>
+          <%= form.text_area :reason, rows: 1, required: true, placeholder: t("admin.actions.reason_placeholder"),
+                class: "w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm" %>
+          <%= form.submit t("admin.tenants.show.actions.resume"),
+                class: "rounded-lg border border-brand-300 px-4 py-2 text-sm font-bold text-brand-700 hover:bg-brand-50" %>
+        <% end %>
+      <% else %>
+        <%= form_with url: admin_tenant_suspend_path(@tenant), method: :post, class: "space-y-2" do |form| %>
+          <p class="text-sm font-semibold">
+            <%= t("admin.tenants.show.actions.suspend") %>
+            <span class="ml-1 text-xs font-normal text-muted"><%= t("admin.tenants.show.actions.suspend_hint") %></span>
+          </p>
+          <%= form.text_area :reason, rows: 1, required: true, placeholder: t("admin.actions.reason_placeholder"),
+                class: "w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm" %>
+          <%= form.submit t("admin.tenants.show.actions.suspend"),
+                class: "rounded-lg border border-danger-300 bg-danger-50 px-4 py-2 text-sm font-bold text-danger-700 hover:bg-danger-100" %>
+        <% end %>
+      <% end %>
+    </div>
+  </section>
+
+  <%# 이벤트 타임라인 — 전사정 단일 뷰(A2) %>
+  <section class="rounded-xl border border-line bg-surface p-5 lg:col-span-2">
+    <h2 class="text-sm font-bold text-muted"><%= t("admin.timeline.title") %></h2>
+    <div class="mt-4">
+      <%= render "admin/tenants/timeline", entries: @timeline %>
+    </div>
+    <p class="mt-4 text-xs text-muted"><%= t("admin.timeline.privacy_notice") %></p>
+  </section>
+</div>

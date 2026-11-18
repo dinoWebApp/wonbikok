@@ -50,7 +50,8 @@
                   { label: t("nav.home"), url: dashboard_path, active: request.path == "/dashboard" },
                   { label: t("nav.students"), url: students_path, active: request.path.start_with?("/students") },
                   { label: t("nav.invoices"), url: invoices_path, active: request.path.start_with?("/invoices") },
-                  { label: t("nav.reminders"), url: reminders_path, active: request.path.start_with?("/reminders") }
+                  { label: t("nav.reminders"), url: reminders_path, active: request.path.start_with?("/reminders") },
+                  { label: t("nav.subscription"), url: subscription_path, active: request.path == "/subscription" }
                 ]
               %>
               <% desktop_tabs.each do |tab| %>
@@ -85,7 +86,7 @@
     </main>
 
     <% if authenticated? %>
-      <%# 모바일 하단 탭 내비게이션 — 홈/원생/청구/알림 (레퍼런스: 미니스탁·캐시노트) %>
+      <%# 모바일 하단 탭 내비게이션 — 홈/원생/청구/알림/구독 (레퍼런스: 미니스탁·캐시노트) %>
       <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface md:hidden"
            aria-label="<%= t("nav.aria_label") %>"
            style="padding-bottom: env(safe-area-inset-bottom)">
@@ -95,7 +96,8 @@
               { label: t("nav.home"), url: dashboard_path, active: request.path == "/dashboard", icon: "home" },
               { label: t("nav.students"), url: students_path, active: request.path.start_with?("/students"), icon: "students" },
               { label: t("nav.invoices"), url: invoices_path, active: request.path.start_with?("/invoices"), icon: "invoices" },
-              { label: t("nav.reminders"), url: reminders_path, active: request.path.start_with?("/reminders"), icon: "reminders" }
+              { label: t("nav.reminders"), url: reminders_path, active: request.path.start_with?("/reminders"), icon: "reminders" },
+              { label: t("nav.subscription"), url: subscription_path, active: request.path == "/subscription", icon: "subscription" }
             ]
           %>
           <% mobile_tabs.each do |tab| %>
@@ -118,6 +120,11 @@
                 <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M6.5 3.5h11a1 1 0 0 1 1 1v16l-3.25-2.2-3.25 2.2-3.25-2.2L5 20.5v-16a1 1 0 0 1 1-1z"/>
                   <path d="M9.2 8.5h5.6M9.2 12h5.6"/>
+                </svg>
+              <% elsif tab[:icon] == "subscription" %>
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="4" y="5.5" width="16" height="13" rx="2"/>
+                  <path d="M7.5 9.5h9M7.5 13h5"/>
                 </svg>
               <% else %>
                 <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

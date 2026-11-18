@@ -75,10 +75,61 @@
   </dl>
 <% end %>
 
-<%# 이번 달 납부·발행 이력: 청구 기능(W3 F4/F5) 제공 전 빈 상태 안내 (PRD 15.4) %>
+<%# 원생별 수납·발행 이력 (W4 F7) — 최근 6개월 월별 납부/미납/발행 상태 표.
+    이력 조회는 @student 연관 + Invoice has_many :cash_receipts 역참조(3-S 결선)로
+    2쿼리(invoices+includes receipts) 한정 — 단일 원생·소규모 N. %>
 <div class="mt-4">
-  <%= render "shared/empty_state", title: t("students.show.history_title"),
-        description: t("students.show.history_empty"), class: "px-6 py-8" %>
+  <% if @student.invoices.empty? %>
+    <%= render "shared/empty_state", title: t("students.show.history_title"),
+          description: t("students.show.history_empty"), class: "px-6 py-8" %>
+  <% else %>
+    <%= render layout: "shared/card", locals: { class: "p-5" } do %>
+      <p class="text-sm font-bold text-ink"><%= t("students.show.history_title") %></p>
+      <% student_invoices = @student.invoices.includes(:cash_receipts) %>
+      <% month_invoices = student_invoices.index_by(&:target_month) %>
+      <% receipts_by_invoice = student_invoices.flat_map(&:cash_receipts)
+                                               .group_by(&:invoice_id) %>
+      <% payment_tones = { "DRAFT" => :neutral, "READY" => :info, "SENT" => :success,
+                           "UNPAID" => :warning, "OVERDUE" => :warning,
+                           "PARTIALLY_PAID" => :warning, "PAID" => :success,
+                           "CANCELLED" => :neutral } %>
+      <% receipt_tones = { "issued" => :success, "failed" => :danger, "cancel_pending" => :warning,
+                           "cancelled" => :neutral, "needs_info" => :warning,
+                           "processing" => :info, "pending" => :info } %>
+      <%# 발행 확정은 issued만(CR-001) — 복수 영수증 보유 시 우선순위로 대표 상태 하나만 표시 %>
+      <% receipt_state_priority = %w[issued failed cancel_pending cancelled needs_info processing pending] %>
+      <dl class="mt-3 text-sm">
+        <% 0.upto(5).each do |months_ago| %>
+          <% month = Date.current.months_ago(months_ago).strftime("%Y-%m") %>
+          <% invoice = month_invoices[month] %>
+          <div class="flex items-center justify-between gap-2 border-b border-line py-2.5 last:border-b-0">
+            <span class="shrink-0 font-medium tabular-nums text-ink"><%= month %></span>
+            <% if invoice %>
+              <span class="min-w-0 flex-1 truncate text-right text-muted">
+                <%= number_with_delimiter(invoice.total_amount) %><%= t("students.index.won") %>
+              </span>
+              <span class="flex shrink-0 gap-1">
+                <%= render "shared/badge", tone: payment_tones.fetch(invoice.status, :neutral),
+                      text: t("invoices.status.#{invoice.status}") %>
+                <% receipts = receipts_by_invoice[invoice.id] || [] %>
+                <% receipt_state = receipt_state_priority.find do |state|
+                     receipts.any? { |receipt| receipt.state == state }
+                   end %>
+                <% if receipt_state %>
+                  <%= render "shared/badge", tone: receipt_tones.fetch(receipt_state, :neutral),
+                        text: t("cash_receipts.state.#{receipt_state}") %>
+                <% else %>
+                  <%= render "shared/badge", tone: :neutral, text: t("students.show.history.no_receipt") %>
+                <% end %>
+              </span>
+            <% else %>
+              <span class="min-w-0 flex-1 text-right text-xs text-muted"><%= t("students.show.history.no_bill") %></span>
+            <% end %>
+          </div>
+        <% end %>
+      </dl>
+    <% end %>
+  <% end %>
 </div>
 
 <div class="mt-6 flex flex-wrap gap-2">

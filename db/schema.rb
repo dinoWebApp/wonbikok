@@ -10,7 +10,32 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_18_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_18_000002) do
+  create_table "admin_users", force: :cascade do |t|
+    t.string "email", null: false
+    t.string "password_digest", null: false
+    t.string "otp_secret"
+    t.integer "failed_attempts", default: 0, null: false
+    t.datetime "locked_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_admin_users_on_email", unique: true
+  end
+
+  create_table "audit_logs", force: :cascade do |t|
+    t.integer "admin_user_id"
+    t.string "action", null: false
+    t.string "target_type"
+    t.integer "target_id"
+    t.text "reason"
+    t.json "detail"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["action", "created_at"], name: "index_audit_logs_on_action_and_created_at"
+    t.index ["admin_user_id"], name: "index_audit_logs_on_admin_user_id"
+    t.index ["target_type", "target_id"], name: "index_audit_logs_on_target_type_and_target_id"
+  end
+
   create_table "beta_applications", force: :cascade do |t|
     t.string "name", null: false
     t.string "title", null: false
@@ -318,6 +343,31 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000001) do
     t.index ["tenant_id"], name: "index_students_on_tenant_id"
   end
 
+  create_table "subscription_events", force: :cascade do |t|
+    t.integer "subscription_id", null: false
+    t.string "event_type", null: false
+    t.integer "amount"
+    t.text "detail"
+    t.string "operated_by"
+    t.datetime "created_at", null: false
+    t.index ["subscription_id", "event_type"], name: "index_subscription_events_on_subscription_id_and_event_type"
+    t.index ["subscription_id"], name: "index_subscription_events_on_subscription_id"
+  end
+
+  create_table "subscriptions", force: :cascade do |t|
+    t.integer "tenant_id", null: false
+    t.string "plan", default: "standard", null: false
+    t.string "status", default: "trial", null: false
+    t.datetime "trial_started_at"
+    t.datetime "trial_ends_at"
+    t.datetime "current_period_start"
+    t.datetime "current_period_end"
+    t.datetime "cancel_scheduled_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["tenant_id"], name: "index_subscriptions_on_tenant_id", unique: true
+  end
+
   create_table "tenants", force: :cascade do |t|
     t.string "name", null: false
     t.string "business_number"
@@ -359,6 +409,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000001) do
     t.index ["tenant_id"], name: "index_users_on_tenant_id"
   end
 
+  add_foreign_key "audit_logs", "admin_users"
   add_foreign_key "cash_receipts", "invoices"
   add_foreign_key "cash_receipts", "tenants"
   add_foreign_key "guardians", "students"
@@ -379,5 +430,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000001) do
   add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "students", "tenants"
+  add_foreign_key "subscription_events", "subscriptions"
+  add_foreign_key "subscriptions", "tenants"
   add_foreign_key "users", "tenants"
 end

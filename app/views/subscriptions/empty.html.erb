@@ -1,0 +1,7 @@
+<%# 레거시 계정(구독 없음 — W4 이전 가입·TrialService 미적용) 안내 화면.
+    빈 상태에 다음 액션 없음 금지(PRD 15.4) — 대시보드 복귀 CTA 제공 %>
+<%= render "shared/page_header", title: t("subscriptions.empty.title") %>
+
+<%= render "shared/empty_state", title: t("subscriptions.empty.title"),
+      description: t("subscriptions.empty.description"),
+      cta_label: t("subscriptions.empty.cta"), cta_url: dashboard_path %>

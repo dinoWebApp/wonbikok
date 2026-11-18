@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <title><%= content_for(:title) || t("admin.layout.title") %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= yield :head %>
+
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <%# 관리자 콘솔 — 데스크톱 우선(A0): 좌측 사이드바 + 넓은 표. 모바일은 지원 범위 아님(PRD 15.6). %>
+  <body class="min-h-dvh bg-canvas font-sans text-base leading-relaxed text-ink antialiased">
+    <div class="mx-auto flex min-h-dvh w-full max-w-7xl">
+      <% if current_admin_user %>
+      <%# 사이드바 — 8항목 중 A1·A2·A3만 활성, 나머지는 미구현(비활성) 표시 %>
+      <aside class="hidden w-60 shrink-0 flex-col border-r border-line bg-surface p-4 md:flex" aria-label="<%= t("admin.layout.nav_aria") %>">
+        <div class="mb-6 flex items-center gap-2 px-2">
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-extrabold text-white">W</span>
+          <div>
+            <p class="text-sm font-extrabold leading-tight"><%= t("admin.layout.title") %></p>
+            <p class="text-xs text-muted"><%= t("admin.layout.subtitle") %></p>
+          </div>
+        </div>
+        <nav class="flex flex-col gap-1">
+          <% admin_nav_items = [
+            { label: t("admin.nav.dashboard"), url: admin_dashboard_path, active: request.path.match?(%r{\A/admin(/\z|/dashboard\z)}), enabled: true },
+            { label: t("admin.nav.tenants"), url: admin_tenants_path, active: request.path.start_with?("/admin/tenants"), enabled: true },
+            { label: t("admin.nav.subscription_payments"), url: admin_subscription_payments_path, active: request.path.start_with?("/admin/subscription_payments"), enabled: true },
+            { label: t("admin.nav.messages"), url: nil, active: false, enabled: false },
+            { label: t("admin.nav.cash_receipts"), url: nil, active: false, enabled: false },
+            { label: t("admin.nav.batches"), url: nil, active: false, enabled: false },
+            { label: t("admin.nav.support"), url: nil, active: false, enabled: false },
+            { label: t("admin.nav.settings"), url: nil, active: false, enabled: false }
+          ] %>
+          <% admin_nav_items.each do |item| %>
+            <% if item[:enabled] %>
+              <%= link_to item[:label], item[:url],
+                    class: "rounded-lg px-3 py-2 text-sm font-semibold #{item[:active] ? 'bg-brand-50 text-brand-700' : 'text-muted hover:bg-canvas hover:text-ink'}",
+                    **(item[:active] ? { "aria-current": "page" } : {}) %>
+            <% else %>
+              <%# 미구현 화면 — 클릭 불가 비활성 표시 %>
+              <span class="cursor-not-allowed rounded-lg px-3 py-2 text-sm font-semibold text-line" title="<%= t("admin.nav.coming_soon") %>" aria-disabled="true">
+                <%= item[:label] %> <span class="text-xs"><%= t("admin.nav.coming_soon") %></span>
+              </span>
+            <% end %>
+          <% end %>
+        </nav>
+        <div class="mt-auto px-3 pt-6">
+          <p class="truncate text-xs text-muted" title="<%= current_admin_user.email %>"><%= current_admin_user.email %></p>
+          <%= button_to t("admin.sessions.sign_out"), admin_session_path, method: :delete,
+                class: "mt-2 rounded-lg px-2 py-1.5 text-sm font-semibold text-muted hover:bg-canvas hover:text-ink" %>
+        </div>
+      </aside>
+      <% end %>
+
+      <div class="<%= current_admin_user ? 'min-w-0 flex-1' : 'flex min-h-dvh w-full items-center justify-center' %>">
+        <%# 모바일 접근 안내(데스크톱 우선 화면) — md 미만에서는 사이드바 대신 상단 바 %>
+        <header class="flex h-12 items-center justify-between border-b border-line bg-surface px-4 md:hidden">
+          <span class="text-sm font-extrabold"><%= t("admin.layout.title") %></span>
+          <% if current_admin_user %>
+            <%= button_to t("admin.sessions.sign_out"), admin_session_path, method: :delete,
+                  form: { class: "inline" },
+                  class: "text-sm font-semibold text-muted" %>
+          <% end %>
+        </header>
+
+        <main class="w-full px-6 py-6 md:px-8">
+          <%= render "shared/flash" %>
+          <%= yield %>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,24 @@
+<% content_for :title, t("admin.sessions.title") %>
+
+<div class="w-full max-w-sm rounded-2xl border border-line bg-surface p-8 shadow-sm">
+  <h1 class="text-xl font-extrabold tracking-tight"><%= t("admin.sessions.title") %></h1>
+  <p class="mt-1 text-sm text-muted"><%= t("admin.sessions.subtitle") %></p>
+
+  <%= form_with scope: :admin_session, url: admin_session_path, method: :post, class: "mt-6 space-y-4" do |form| %>
+    <div>
+      <%= form.label :email, t("admin.sessions.email"), class: "block text-sm font-semibold" %>
+      <%= form.email_field :email, required: true, autofocus: true, autocomplete: "email",
+            value: @admin_user.email,
+            class: "mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" %>
+    </div>
+    <div>
+      <%= form.label :password, t("admin.sessions.password"), class: "block text-sm font-semibold" %>
+      <%= form.password_field :password, required: true, autocomplete: "current-password",
+            class: "mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" %>
+    </div>
+    <%= form.submit t("admin.sessions.next_step"),
+          class: "w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700" %>
+  <% end %>
+
+  <p class="mt-4 text-xs text-muted"><%= t("admin.sessions.lock_hint") %></p>
+</div>

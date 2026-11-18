@@ -111,6 +111,81 @@ class StudentsCsvImportServiceTest < ActiveSupport::TestCase
     assert_includes result.errors.first.reasons.join, "인코딩"
   end
 
+  # SUB-001(C-1): CSV 경로도 플랜 잔여 슬롯을 벗어나지 않는다 — 초과 재원 행은 오류행 처리
+  test "잔여 1 슬롯에 재원 2행은 1성공/1오류행 경계로 처리된다(SUB-001)" do
+    upload = csv_upload(<<~CSV)
+      원생명,학년,월 원비,납부일,납부유형,상태,보호자명,보호자 휴대폰번호
+      정다은,초1,180000,15,계좌이체,재원,정어머님,01055556666
+      한지호,중2,320000,20,현금,재원,한아버님,01077778888
+    CSV
+
+    result = StudentsCsvImportService.new(tenant: @tenant, upload: upload,
+                                          remaining_active_slots: 1).call
+
+    assert_equal 1, result.success_count
+    assert_equal 1, result.errors.size
+    assert_includes result.errors.first.reasons.join, "잔여 슬롯 0명" # "잔여 N명 초과" 사유
+    assert_not_nil @tenant.students.reload.find_by(name: "정다은")
+    assert_nil @tenant.students.find_by(name: "한지호")
+  end
+
+  test "휴원·퇴원 행은 잔여 슬롯을 소진하지 않는다(SUB-001 — 재원 기준)" do
+    upload = csv_upload(<<~CSV)
+      원생명,학년,월 원비,납부일,납부유형,상태,보호자명,보호자 휴대폰번호
+      쉬는원생,초2,200000,10,계좌이체,휴원,쉬어머님,01044445555
+      나갈원생,초3,220000,12,현금,퇴원,나어머님,01033334444
+    CSV
+
+    result = StudentsCsvImportService.new(tenant: @tenant, upload: upload,
+                                          remaining_active_slots: 0).call
+
+    assert_equal 2, result.success_count # 잔여 0이어도 비재원 행은 등록 가능
+    assert_empty result.errors
+  end
+
+  # SUB-001(C-1) 경계 보강: 잔여 1에 재원 3행 — 초과 행 전부 오류행으로 수집(1성공/2오류)
+  test "잔여 1 슬롯에 재원 3행은 1성공/2오류행으로 수집된다(SUB-001)" do
+    upload = csv_upload(<<~CSV)
+      원생명,학년,월 원비,납부일,납부유형,상태,보호자명,보호자 휴대폰번호
+      정다은,초1,180000,15,계좌이체,재원,정어머님,01055556666
+      한지호,중2,320000,20,현금,재원,한아버님,01077778888
+      초과원생,초3,220000,25,계좌이체,재원,초과어머님,01012341234
+    CSV
+
+    result = StudentsCsvImportService.new(tenant: @tenant, upload: upload,
+                                          remaining_active_slots: 1).call
+
+    assert_equal 1, result.success_count
+    assert_equal 2, result.errors.size
+    assert_equal [ 3, 4 ], result.errors.map(&:line) # 초과 재원 2행 전부 행번호와 함께 수집
+    result.errors.each do |error|
+      assert_includes error.reasons.join, "잔여 슬롯"
+    end
+    assert_not_nil @tenant.students.reload.find_by(name: "정다은")
+    assert_nil @tenant.students.find_by(name: "한지호")
+    assert_nil @tenant.students.find_by(name: "초과원생")
+  end
+
+  # SUB-001(C-1) 보강: 재원·휴원 혼합 파일 — 휴원 행은 슬롯 소진 없이 등록된다
+  test "재원·휴원 혼합 파일에서 휴원 행은 잔여 슬롯을 소진하지 않는다(SUB-001)" do
+    upload = csv_upload(<<~CSV)
+      원생명,학년,월 원비,납부일,납부유형,상태,보호자명,보호자 휴대폰번호
+      정다은,초1,180000,15,계좌이체,재원,정어머님,01055556666
+      한지호,중2,320000,20,현금,재원,한아버님,01077778888
+      쉬는원생,초2,200000,10,계좌이체,휴원,쉬어머님,01044445555
+    CSV
+
+    result = StudentsCsvImportService.new(tenant: @tenant, upload: upload,
+                                          remaining_active_slots: 1).call
+
+    assert_equal 2, result.success_count # 재원 1(슬롯 소진) + 휴원 1(무소진)
+    assert_equal 1, result.errors.size
+    assert_equal 3, result.errors.first.line # 슬롯 초과는 재원 2행째만
+    assert_not_nil @tenant.students.reload.find_by(name: "정다은")
+    assert_not_nil @tenant.students.find_by(name: "쉬는원생")
+    assert_nil @tenant.students.find_by(name: "한지호")
+  end
+
   private
 
   def csv_upload(text)

@@ -84,7 +84,30 @@ Rails.application.routes.draw do
 
   # 대시보드 (인증 후 앱 홈 — 루트가 랜딩으로 바뀌면서 이동, 2026-11-04)
   get "/dashboard", to: "dashboard#show", as: :dashboard
+  get "dashboard/report", to: "dashboard#report", as: :dashboard_report # 월간 마감 리포트 (W4 F7 — HTML, PDF 후속)
+
+  # 구독·결제 (W4 F8 v1.0 — 단일 리소스 show, 플랜·체험·상태·이력 표시)
+  resource :subscription, only: :show
 
   # 학부모 청구 링크 (W3 F9) — 공개·비로그인, 예측 불가 토큰 (LNK-001~003)
   get "/b/:token", to: "billing_links#show", as: :billing_link
+
+  # 관리자 콘솔 (W4 A1~A3 — 별도 인증 체계, 운영 배포 시 서브도메인 격리 가능 구조)
+  namespace :admin do
+    root to: "dashboards#show"
+    get "dashboard", to: "dashboards#show", as: :dashboard
+    resource :session, only: %i[new create destroy]
+    post "session/otp", to: "sessions#create_otp", as: :session_otp
+    resources :tenants, only: %i[index show]
+    post "tenants/:tenant_id/change_plan", to: "tenant_actions#change_plan", as: :tenant_change_plan
+    post "tenants/:tenant_id/extend_trial", to: "tenant_actions#extend_trial", as: :tenant_extend_trial
+    post "tenants/:tenant_id/suspend", to: "tenant_actions#suspend", as: :tenant_suspend
+    post "tenants/:tenant_id/resume", to: "tenant_actions#resume", as: :tenant_resume
+    resources :subscription_payments, only: :index do
+      collection do
+        get :refund_new
+        post :refund
+      end
+    end
+  end
 end

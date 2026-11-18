@@ -36,6 +36,7 @@ ko:
     students: 원생
     invoices: 청구
     reminders: 알림
+    subscription: 구독
   auth:
     login_required: "로그인이 필요합니다."
     invalid_credentials: "휴대폰번호 또는 비밀번호가 올바르지 않습니다."
@@ -109,11 +110,57 @@ ko:
     empty: "아직 표시할 내용이 없습니다."
     invoices_link: "이번 달 청구 만들기"
     invoices_hint: "월간 청구 생성 → 미리보기·확정 → 알림톡 발송"
-    reminders_link: "미납 리마인더"
     todo_title: "오늘 할 일"
-    unpaid_count: "미납 청구"
     upcoming_reminders: "다가오는 리마인더"
     amount_basis: "미납 기준: 취소 청구 제외·납부 기한 경과 건"
+    # ------------------------------------------------------------------
+    # 마감 대시보드 (W4 F7 — PRD 7장)
+    # ------------------------------------------------------------------
+    report_link: "마감 리포트"
+    todo:
+      unconfirmed_payments: "미확인 입금"
+      failed_receipts: "발행 실패"
+      unit_cases: 건
+      overdue_days: "%{days}일 경과"
+    unissued:
+      title: "발행 대기 잔여"
+      description: "입금 확인됐으나 현금영수증이 발행되지 않은 원생이 있습니다."
+      more: "외 %{count}명"
+      month_end_notice: "월말이 임박했습니다. 가산세 방지를 위해 이번 달 안에 발행을 마쳐 주세요."
+      action: "발행 화면으로 이동"
+    metrics:
+      title: "%{month} 마감 현황"
+      billed: 청구액
+      paid: 수납액
+      unpaid: 미납액
+      rate: 납부율
+      draft_note: "초안 %{count}건 포함"
+      basis_label: "금액 기준:"
+      basis_billed: "청구 = 당월 청구 합계(취소 제외·초안 포함)"
+      basis_paid: "수납 = 실수납 기록 합계"
+    quick:
+      unpaid_list: "미납자 목록"
+      failed_receipts: "발행 실패 확인"
+      new_student: "원생 추가"
+    closing:
+      title: "이번 달 마감 완료"
+      description: "수납 100% 또는 월 경과 조건에 도달했습니다. 수고하셨습니다."
+    empty:
+      no_students_title: "첫 원생을 등록해 보세요"
+      no_students_description: "원생을 등록하면 이번 달 원비 현황과 오늘 할 일이 표시됩니다."
+      no_students_cta: "첫 원생 등록하기"
+      no_invoices_title: "첫 청구를 만들어 보세요"
+      no_invoices_description: "이번 달 청구를 만들면 납부 안내와 입금 확인이 시작됩니다."
+      no_invoices_cta: "첫 청구 만들기"
+    report:
+      title: "%{month} 마감 리포트"
+      metrics_title: "지표 요약"
+      unpaid_title: "미납 명단"
+      unpaid_empty: "미납이 없습니다. 이번 달 수납이 모두 확인되었습니다."
+      unpaid_row_note: "총 %{total} · 수납 %{paid}"
+      unpaid_total: "미납 합계"
+      receipt_title: "발행 요약"
+      receipt_unit: 건
   students:
     index:
       title: "원생 관리"
@@ -141,8 +188,13 @@ ko:
       guardian: "대표 보호자"
       payment_day_of_month: "매월 %{day}일"
       sibling_notice: "같은 보호자 연락처로 등록된 원생이 있습니다."
-      history_title: "이번 달 납부·발행 이력"
-      history_empty: "아직 이력이 없습니다. 청구 기능은 다음 업데이트에 제공됩니다."
+      history_title: "수납·발행 이력(최근 6개월)"
+      history_empty: "아직 수납·발행 이력이 없습니다."
+      history:
+        no_bill: "청구 없음"
+        no_receipt: 미발행
+    errors:
+      plan_limit_reached: "재원 원생 %{current_count}명이 플랜 상한 %{limit}명에 도달했습니다. 새 원생 등록이 차단되며, 기존 원생 데이터는 그대로 유지됩니다."
     actions:
       pause: "휴원 처리"
       withdraw: "퇴원 처리"
@@ -192,7 +244,61 @@ ko:
         status: "상태는 재원/휴원/퇴원 중 하나로 입력해 주세요."
         required_guardian_name: "보호자명은 필수입니다."
         phone: "보호자 휴대폰번호 형식이 올바르지 않습니다. 예: 01012345678"
+        plan_limit_exceeded: "플랜 원생 수 상한을 초과했습니다(잔여 슬롯 %{remaining}명). 플랜 상향 또는 기존 원생 정리 후 다시 시도해 주세요."
         duplicate_suspect: "중복 의심 — 기존 원생 %{name}과(와) 보호자 연락처 또는 이름이 같습니다. 확인 후 등록해 주세요."
+  # ------------------------------------------------------------------
+  # 구독·결제 (W4 F8 v1.0 최소형 — PRD 7장 F8·11장, SUB-001~004)
+  # ------------------------------------------------------------------
+  subscriptions:
+    show:
+      title: 구독 관리
+      subtitle: "플랜·체험·결제 상태와 이력을 확인합니다."
+      plan_label: 현재 플랜
+      status_label: 구독 상태
+      trial_badge: 무료체험
+      trial_ends_at_label: 체험 종료일
+      trial_remain_days: "잔여 %{count}일"
+      trial_expired: 체험 기한 경과
+      period_label: 결제 주기
+      cancel_scheduled_label: 해지 예약
+      cancel_scheduled_value: "%{date} 예정"
+      pending_plan_label: 적용 예정 플랜
+      pending_plan_effective: "%{date}부터 적용"
+      students_limit_title: 원생 수 상한
+      students_limit_full: 상한 도달
+      students_limit_full_notice: "상한에 도달했습니다. 새 원생 등록은 차단되며 기존 원생 데이터는 그대로 유지됩니다."
+      students_limit_near_notice: "상한이 가깝습니다. 원생이 더 늘어날 예정이라면 플랜 상향을 검토해 주세요."
+      students_unit: 명
+      events_title: 결제·구독 이력
+      events_empty: "아직 기록된 이력이 없습니다."
+      operated_by: "처리자 %{operator}"
+      won: 원
+      past_due_banner: "결제가 완료되지 않아 유예 상태입니다."
+      retention_notice: "데이터는 %{deadline}까지 보관됩니다(잔여 %{remaining}일). 기간 내 결제하면 바로 계속 사용할 수 있습니다."
+      suspended_banner: "서비스가 일시 정지되었습니다."
+      suspended_notice: "원생·청구 데이터는 안전하게 보관되며 조회만 가능합니다. 결제 후 즉시 재개됩니다."
+      plan_change_title: 플랜 변경 안내
+      plan_change_notice: "플랜 변경은 운영 관리자를 통해 처리됩니다. 원비콕 고객지원으로 요청해 주세요."
+      plan_upgrade_notice: "상향: 요청 즉시 적용되며 결제 주기는 그대로 유지됩니다."
+      plan_downgrade_notice: "하향: 현재 결제 기간이 끝나는 다음 달부터 적용됩니다."
+      manual_payment_title: 결제 등록 안내
+      manual_payment_notice: "무통장 입금 등 수동 결제는 운영 관리자가 확인 후 등록합니다. 등록 즉시 이용 기간이 1개월 연장됩니다."
+    status: { trial: 무료체험, active: 이용 중, past_due: 결제 유예, suspended: 일시정지, cancelled: 해지 }
+    plan: { light: 라이트, standard: 스탠다드 }
+    events:
+      trial_started: 체험 시작
+      trial_extended: 체험 연장
+      manual_payment: 수동 결제
+      payment_failed: 결제 실패
+      retry: 재시도 예약
+      past_due: 결제 유예 전환
+      suspended: 일시정지
+      plan_changed: 플랜 변경
+      refund: 환불
+    empty:
+      title: 구독 정보가 없습니다
+      description: "구독은 가입 시 자동 생성됩니다. 계정에 문제가 있다면 고객지원으로 문의해 주세요."
+      cta: 대시보드로 이동
   practice:
     badge: "연습 모드"
     notice: "연습 모드입니다. 실제 알림톡 발송과 현금영수증 발행은 발생하지 않습니다."
@@ -293,6 +399,17 @@ ko:
               tenant_mismatch: "청구와 교습소가 일치하지 않습니다."
             status:
               already_cancelled: "이미 취소된 수납입니다."
+        subscription:
+          attributes:
+            status:
+              manual_payment_not_accepted: "해지된 구독에는 결제를 등록할 수 없습니다."
+            amount:
+              payment_amount_invalid: "결제 금액은 1원 이상이어야 합니다."
+            base:
+              payment_method_blank: "결제 수단을 입력해 주세요."
+              plan_unknown: "알 수 없는 플랜입니다."
+              plan_unchanged: "현재와 동일한 플랜입니다."
+              plan_change_reason_blank: "플랜 변경 사유를 입력해 주세요(필수)."
   enums:
     tenant:
       business_type:
@@ -918,3 +1035,263 @@ ko:
       title: "링크를 사용할 수 없습니다"
       description: "안내 링크가 만료되었거나 취소되어 청구 내용을 표시할 수 없습니다."
       contact_hint: "청구 내용은 교습소 원장님께 직접 문의해 주세요."
+  # ------------------------------------------------------------------
+  # 관리자 콘솔 (W4 A0~A3 — PRD 12장, ADM-001/002·TEN-003)
+  # ------------------------------------------------------------------
+  admin:
+    layout:
+      title: "원비콕 운영 콘솔"
+      subtitle: "운영자 전용"
+      nav_aria: "관리자 메뉴"
+    nav:
+      dashboard: "운영 대시보드"
+      tenants: "이용자 관리"
+      subscription_payments: "구독·결제"
+      messages: "알림톡 발송 관리"
+      cash_receipts: "현금영수증 발행 관리"
+      batches: "배치 작업 제어"
+      support: "CS 문의 관리"
+      settings: "운영 설정"
+      coming_soon: "준비 중"
+    sessions:
+      title: "관리자 로그인"
+      subtitle: "1단계: 이메일·비밀번호 확인"
+      email: "이메일"
+      password: "비밀번호"
+      next_step: "다음(OTP 단계)"
+      lock_hint: "로그인 5회 실패 시 계정이 잠깁니다. 해제는 서버 콘솔에서만 가능합니다."
+      otp_title: "2단계 인증"
+      otp_description: "%{email} 계정의 인증 앱에서 현재 6자리 코드를 입력해 주세요."
+      otp_code: "인증 코드(6자리)"
+      sign_in: "로그인"
+      back_to_step1: "1단계로 돌아가기"
+      invalid_credentials: "이메일 또는 비밀번호가 올바르지 않습니다."
+      invalid_otp: "인증 코드가 올바르지 않습니다."
+      locked_notice: "실패 횟수 초과로 계정이 잠겼습니다. 콘솔에서 해제 후 다시 시도해 주세요."
+      session_expired: "인증 단계가 만료되었습니다. 다시 로그인해 주세요."
+      login_required: "관리자 로그인이 필요합니다."
+      signed_in: "로그인되었습니다."
+      signed_out: "로그아웃되었습니다."
+      sign_out: "로그아웃"
+    dashboard:
+      title: "운영 대시보드"
+      services_label: "외부 서비스 상태"
+      view_list: "목록 보기"
+      ops_status:
+        title: "오늘의 운영 상태(최근 24시간 — 실시간)"
+        message_failed_24h: "발송 실패(24시간)"
+        receipt_failed_24h: "발행 실패(24시간)"
+        receipt_processing: "발행 처리중"
+        receipt_cancel_pending: "발행 취소 대기"
+      metrics:
+        title: "핵심 지표"
+        mau: "MAU(근사)"
+        trial_d7: "체험 만료 D-7 예정"
+        paid_conversion: "유료 전환율"
+        monthly_cancellations: "월 해지"
+      formulas:
+        mau: "산식: 최근 30일 세션 생성 수(로그인 세션 기준)"
+        trial_d7: "산식: 체험 중 구독 중 trial_ends_at이 7일 이내 도래"
+        paid_conversion: "산식: active ÷ (trial + active), 소수점 반올림 %"
+        monthly_cancellations: "산식: 당월 내 cancelled 상태로 관측된 구독 수(전환 시점 미기록 — updated_at 근사)"
+        past_due: "산식: 현재 past_due 상태 구독 수"
+        stale_receipt_failures: "산식: failed 상태로 24시간 이상 경과한 현금영수증 건수"
+      trend:
+        title: "발송·발행 추이(최근 7일 — 생성 건수)"
+        date: "날짜"
+        messages: "발송"
+        receipts: "발행"
+      queues:
+        title: "대응 대기 큐"
+        past_due: "결제 실패 방치(past_due)"
+        stale_receipt_failures: "발행 실패 방치"
+        go_a3: "구독·결제 관리에서 보기(A3)"
+        a5_not_ready: "A5(현금영수증 발행 관리)는 미구현 — 후속 화면에서 처리"
+      services:
+        solapi: "솔라피"
+        portone: "포트원"
+        barobill: "바로빌"
+      service_states:
+        simulated: "SIMULATED(미확인)"
+    tenants:
+      index:
+        title: "이용자(원장) 관리"
+        search_scope: "검색 대상: 상호 · 사업자등록번호 · 교습소 ID (휴대폰번호 검색은 후속)"
+        search_placeholder: "상호 / 사업자번호 / ID"
+        search: "검색"
+        no_results: "'%{query}' 검색 결과가 없습니다."
+        empty: "등록된 이용자가 없습니다."
+        col_id: "ID"
+        col_name: "상호"
+        col_owner: "원장명"
+        col_business_number: "사업자번호"
+        col_phone: "휴대폰번호"
+        col_plan: "플랜·상태"
+        col_students: "원생 수"
+        col_joined: "가입일"
+        no_subscription: "구독 없음"
+        mask_notice: "개인정보는 기본 마스킹되어 표시됩니다(ADM-002)."
+      show:
+        title: "%{name}"
+        tenant_id: "교습소 ID %{id}"
+        suspension_recorded: "정지 기록"
+        back_to_index: "목록으로"
+        basic_info: "기본 정보"
+        owner_name: "원장명"
+        owner_phone: "휴대폰번호"
+        business_number: "사업자번호"
+        business_email: "사업자 이메일"
+        joined_at: "가입일시"
+        onboarding: "온보딩"
+        onboarding_done: "완료"
+        onboarding_step: "%{step}/%{final} 단계 진행중"
+        subscription: "플랜·구독"
+        plan: "플랜"
+        subscription_status: "구독 상태"
+        trial_remain: "체험 잔여일"
+        trial_days: "%{days}일"
+        students_limit: "원생 수 / 상한"
+        period: "현재 기간"
+        no_subscription: "구독 레코드가 없습니다."
+        activity: "마지막 활동·당월 요약"
+        last_login: "마지막 앱 접속"
+        last_message: "마지막 발송"
+        last_receipt: "마지막 발행"
+        month_summary: "당월 요약"
+        month_messages: "발송 %{count}건"
+        month_receipts: "발행 %{count}건"
+        month_formula: "산식: 당월(초일 이후) 발송 성공·대체·연습 기록 합계 / issued 상태 발행 합계"
+        actions:
+          title: "조치(사유 필수 — 모든 조치는 감사 로그에 영구 보존)"
+          change_plan: "플랜 수동 변경"
+          extend_trial: "체험 연장"
+          extend_trial_hint: "1회 최대 30일 · 누적 60일"
+          suspend: "정지 기록"
+          suspend_hint: "v1.0은 이력 기록만(실제 로그인 차단은 후속)"
+          resume: "정지 해제 기록"
+    actions:
+      reason_placeholder: "조치 사유를 입력해 주세요(필수)"
+      notices:
+        plan_changed: "플랜을 %{plan}(으)로 변경했습니다."
+        plan_change_scheduled: "플랜 하향이 다음 결제 기간부터 적용 예정입니다(익월 적용 규칙)."
+        trial_extended: "체험을 %{days}일 연장했습니다."
+        suspend_recorded: "정지 조치를 기록했습니다."
+        resume_recorded: "정지 해제를 기록했습니다."
+      errors:
+        reason_required: "조치 사유는 필수입니다."
+        invalid_plan: "플랜 값이 올바르지 않거나 구독 상태가 변경 불가입니다."
+        no_subscription: "구독 레코드가 없는 이용자입니다."
+        invalid_days: "연장 일수는 1~30일이어야 합니다."
+        not_extendable: "체험 연장 대상 상태가 아닙니다(trial·past_due·suspended만 가능)."
+        extension_cap: "누적 연장 한도 초과입니다(사용 %{used}일 / 한도 %{cap}일)."
+    subscription_statuses:
+      plan:
+        light: "라이트"
+        standard: "스탠다드"
+      status:
+        trial: "체험"
+        active: "활성"
+        past_due: "결제 유예"
+        suspended: "일시정지"
+        cancelled: "해지"
+    subscription_payments:
+      index:
+        title: "구독·결제 관리"
+        history_title: "결제 이력"
+        no_events: "해당 조건의 결제 이력이 없습니다."
+        col_at: "일시"
+        col_tenant: "이용자"
+        col_plan: "플랜"
+        col_status: "구독 상태"
+        col_type: "구분"
+        col_amount: "금액"
+        col_note: "비고"
+        past_due_title: "결제 실패 모니터링(일시정지 도달 이용자)"
+        past_due_formula: "데이터 삭제 예정 = 최근 past_due 전환 시점 + %{days}일(이벤트 부재 시 갱신시각 근사)"
+        no_past_due: "결제 유예 이용자가 없습니다."
+        days_left: "삭제 예정 D-%{days}"
+        deadline: "삭제 예정일: %{date}"
+        revenue_title: "매출 집계(월별)"
+        revenue_formula: "산식: 월별 manual_payment 이벤트 합계(수동 결제 기록 기준 — MRR 근사, 실결제 연동 전)"
+        col_month: "월"
+        col_revenue: "매출"
+      filter:
+        all: "전체"
+        apply: "조회"
+      event_types:
+        manual_payment: "수동 결제"
+        payment_failed: "결제 실패"
+        retry: "재시도"
+        refund: "환불"
+      refund:
+        title: "환불 접수"
+        target: "대상: %{name}"
+        back_to_index: "목록으로"
+        branch: "정책 분기"
+        amount: "환불 금액(원)"
+        amount_hint: "기본값은 최근 수동 결제 금액입니다. 운영자 확정값을 입력해 주세요."
+        reason: "환불 사유(필수)"
+        confirm: "환불 확정(기록)"
+        external_notice: "실제 이체는 외부 처리 대상입니다 — 본 화면은 기록만 남깁니다(v1.0)."
+        history_title: "환불 이력(최근 10건)"
+        no_history: "환불 이력이 없습니다."
+      notices:
+        refund_recorded: "환불을 기록했습니다. 실제 이체는 별도 처리 대상입니다."
+      errors:
+        no_subscription: "구독 레코드가 없는 이용자입니다."
+        invalid_branch: "정책 분기 값이 올바르지 않습니다."
+        invalid_amount: "환불 금액은 0 이상이어야 합니다."
+    refund:
+      branches:
+        service_fault: "서비스 귀책(전액)"
+        user_fault_monthly: "이용자 귀책(월 결제)"
+        annual_proration: "기간제 결제(잔여 일할)"
+      policies:
+        service_fault: "서비스 귀책(결제 오류·발행 불능 등) — 결제 금액 전액 환불(PRD 11.3)."
+        user_fault_monthly: "이용자 귀책 월 결제 — 당월 내 환불 규정을 문구로 고지 후 확정(법률 검토 전 보수적 운영: 자동 산정 없음, 기본 0원)."
+        annual_proration: "기간제 결제 — 잔여 기간 일할 환불. 금액 = 결제금 × 잔여일 ÷ 기간일(정수 절삭)."
+      prorated_detail: "기간 %{period_days}일 중 잔여 %{remaining_days}일 기준"
+    timeline:
+      title: "이벤트 타임라인(전사정 — 최신순)"
+      empty: "표시할 이벤트가 없습니다."
+      privacy_notice: "개인정보는 마스킹·식별자 수준만 표시합니다(ADM-002). 온보딩 완료 시점은 미기록으로 가입 시점 항목에 현재 상태 병기(v1.0)."
+      kinds:
+        tenant_created: "가입"
+        onboarding_state: "온보딩 현재 상태"
+      subscription_events:
+        trial_started: "체험 시작"
+        manual_payment: "수동 결제"
+        payment_failed: "결제 실패"
+        retry: "결제 재시도"
+        past_due: "결제 유예 전환"
+        suspended: "서비스 일시정지"
+        plan_changed: "플랜 변경(관리자)"
+        refund: "환불 기록"
+        trial_extended: "체험 연장(관리자)"
+      message_templates:
+        invoice_notice: "납부 안내 발송"
+        reminder_d3: "리마인더 D-3 발송"
+        reminder_d7: "리마인더 D-7 발송"
+        reminder_month_end: "월말 리마인더 발송"
+        cash_receipt_issued: "현금영수증 발행 안내 발송"
+        cash_receipt_failed: "현금영수증 실패 알림 발송"
+      cash_receipt_states:
+        needs_info: "현금영수증 정보 미비"
+        pending: "현금영수증 발행 대기"
+        processing: "현금영수증 발행 처리중"
+        issued: "현금영수증 발행 완료"
+        failed: "현금영수증 발행 실패"
+        cancel_pending: "현금영수증 취소 요청중"
+        cancelled: "현금영수증 취소 완료"
+    audit:
+      actions:
+        login: "관리자 로그인"
+        logout: "관리자 로그아웃"
+        login_failure: "관리자 로그인 실패"
+        account_locked: "관리자 계정 잠금"
+        personal_info_viewed: "이용자 정보 열람"
+        plan_changed: "플랜 수동 변경"
+        trial_extended: "체험 연장"
+        tenant_suspended: "계정 정지 기록"
+        tenant_resumed: "계정 정지 해제 기록"
+        refund_confirmed: "환불 확정 기록"

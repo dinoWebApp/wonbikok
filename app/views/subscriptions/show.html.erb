@@ -1,0 +1,152 @@
+<%= render "shared/page_header", title: t("subscriptions.show.title"),
+      description: t("subscriptions.show.subtitle") %>
+
+<%# 상태 배너 (SUB-002·003·004 — 앱 내 배너 축. 알림톡 통지는 후속 잡 — 03_implementation.md) %>
+<% if @subscription.past_due? %>
+  <div class="mb-4 rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
+    <p class="font-semibold"><%= t("subscriptions.show.past_due_banner") %></p>
+    <% if @retention_deadline.present? %>
+      <p class="mt-1 leading-relaxed">
+        <%= t("subscriptions.show.retention_notice",
+              deadline: l(@retention_deadline), remaining: @retention_remaining) %>
+      </p>
+    <% end %>
+  </div>
+<% elsif @subscription.suspended? %>
+  <div class="mb-4 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700" role="alert">
+    <p class="font-semibold"><%= t("subscriptions.show.suspended_banner") %></p>
+    <p class="mt-1 leading-relaxed"><%= t("subscriptions.show.suspended_notice") %></p>
+  </div>
+<% end %>
+
+<%# 구독 현황 %>
+<%= render layout: "shared/card", locals: { class: "p-5 mb-4 space-y-4 text-sm" } do %>
+  <div class="flex items-center justify-between">
+    <span class="font-semibold text-muted"><%= t("subscriptions.show.plan_label") %></span>
+    <span class="flex items-center gap-2">
+      <span class="font-bold text-ink"><%= t("subscriptions.plan.#{@subscription.plan}") %></span>
+      <% if @subscription.trial? %>
+        <%= render "shared/badge", tone: :info, text: t("subscriptions.show.trial_badge") %>
+      <% end %>
+    </span>
+  </div>
+  <div class="flex items-center justify-between">
+    <span class="font-semibold text-muted"><%= t("subscriptions.show.status_label") %></span>
+    <%# 상태→배지 톤 매핑(표현 계층) — 헬퍼 추출은 3-S 통합 시 검토(whitelist) %>
+    <% status_tone = { "trial" => :info, "active" => :success, "past_due" => :warning,
+                       "suspended" => :danger, "cancelled" => :neutral }.fetch(@subscription.status, :neutral) %>
+    <%= render "shared/badge", tone: status_tone,
+          text: t("subscriptions.status.#{@subscription.status}") %>
+  </div>
+  <% if @subscription.trial? %>
+    <div class="flex items-center justify-between">
+      <span class="font-semibold text-muted"><%= t("subscriptions.show.trial_ends_at_label") %></span>
+      <span class="tabular-nums text-ink">
+        <%= l(@subscription.trial_ends_at.to_date) %>
+        <% remain = @subscription.trial_remain_days %>
+        <% if remain %>
+          <%# D-7: 임박 강조(PRD 7장 F8 — 만료 7일 전 카드 등록 요구) %>
+          <% if remain >= 0 %>
+            <span class="<%= remain <= 7 ? "font-semibold text-warning-700" : "text-muted" %>">
+              · <%= t("subscriptions.show.trial_remain_days", count: remain) %>
+            </span>
+          <% else %>
+            · <%= t("subscriptions.show.trial_expired") %>
+          <% end %>
+        <% end %>
+      </span>
+    </div>
+  <% end %>
+  <% if @subscription.current_period_start.present? && @subscription.current_period_end.present? %>
+    <div class="flex items-center justify-between">
+      <span class="font-semibold text-muted"><%= t("subscriptions.show.period_label") %></span>
+      <span class="tabular-nums text-ink">
+        <%= l(@subscription.current_period_start.to_date) %> ~ <%= l(@subscription.current_period_end.to_date) %>
+      </span>
+    </div>
+  <% end %>
+  <% if @subscription.cancel_scheduled_at.present? %>
+    <div class="flex items-center justify-between">
+      <span class="font-semibold text-muted"><%= t("subscriptions.show.cancel_scheduled_label") %></span>
+      <%= render "shared/badge", tone: :warning,
+            text: t("subscriptions.show.cancel_scheduled_value", date: l(@subscription.cancel_scheduled_at.to_date)) %>
+    </div>
+  <% end %>
+  <% if @pending_downgrade.present? %>
+    <% detail = @pending_downgrade.detail_hash %>
+    <div class="flex items-center justify-between">
+      <span class="font-semibold text-muted"><%= t("subscriptions.show.pending_plan_label") %></span>
+      <span class="text-ink">
+        <%= t("subscriptions.plan.#{detail['to']}", default: detail["to"]) %>
+        <% if detail["effective_on"].present? %>
+          · <%= t("subscriptions.show.pending_plan_effective", date: detail["effective_on"]) %>
+        <% end %>
+      </span>
+    </div>
+  <% end %>
+<% end %>
+
+<%# 원생 수 상한 (SUB-001 — 상한 초과 시 신규 등록 차단·기존 데이터 유지) %>
+<%= render layout: "shared/card", locals: { class: "p-5 mb-4" } do %>
+  <div class="flex items-center justify-between">
+    <h2 class="text-sm font-bold text-ink"><%= t("subscriptions.show.students_limit_title") %></h2>
+    <% if @subscription.students_limit_reached?(@students_count) %>
+      <%= render "shared/badge", tone: :danger, text: t("subscriptions.show.students_limit_full") %>
+    <% end %>
+  </div>
+  <% limit = @subscription.students_limit %>
+  <% ratio = [ (@students_count.to_f / limit * 100).round, 100 ].min %>
+  <p class="mt-2 text-2xl font-bold tabular-nums text-ink">
+    <%= number_with_delimiter(@students_count) %>
+    <span class="text-sm font-medium text-muted">/ <%= number_with_delimiter(limit) %><%= t("subscriptions.show.students_unit") %></span>
+  </p>
+  <div class="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100" role="presentation">
+    <div class="h-full rounded-full <%= ratio >= 100 ? "bg-danger-500" : "bg-brand-500" %>" style="width: <%= ratio %>%;"></div>
+  </div>
+  <% if ratio >= 100 %>
+    <p class="mt-2 text-xs leading-relaxed text-danger-700"><%= t("subscriptions.show.students_limit_full_notice") %></p>
+  <% elsif ratio >= 80 %>
+    <p class="mt-2 text-xs leading-relaxed text-warning-700"><%= t("subscriptions.show.students_limit_near_notice") %></p>
+  <% end %>
+<% end %>
+
+<%# 결제·구독 이력 (subscription_events — A2 타임라인·A3 결제 이력 동일 장부) %>
+<%= render layout: "shared/card", locals: { class: "p-5 mb-4" } do %>
+  <h2 class="text-sm font-bold text-ink"><%= t("subscriptions.show.events_title") %></h2>
+  <% if @recent_events.any? %>
+    <ul class="mt-3 divide-y divide-line">
+      <% @recent_events.each do |event| %>
+        <li class="flex items-center justify-between gap-3 py-3 text-sm">
+          <span class="min-w-0">
+            <span class="font-semibold text-ink"><%= t("subscriptions.events.#{event.event_type}") %></span>
+            <% if event.amount.present? %>
+              <span class="tabular-nums text-muted">· <%= number_with_delimiter(event.amount) %><%= t("subscriptions.show.won") %></span>
+            <% end %>
+            <% if event.operated_by.present? %>
+              <span class="block text-xs text-muted"><%= t("subscriptions.show.operated_by", operator: event.operated_by) %></span>
+            <% end %>
+          </span>
+          <span class="shrink-0 text-xs tabular-nums text-muted"><%= l(event.created_at, format: :short) %></span>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p class="mt-3 text-sm text-muted"><%= t("subscriptions.show.events_empty") %></p>
+  <% end %>
+<% end %>
+
+<%# 플랜 변경 안내 — v1.0: 실행은 관리자(A2) 조치 또는 요청 경유. 화면은 안내 중심 %>
+<%= render layout: "shared/card", locals: { class: "p-5 mb-4" } do %>
+  <h2 class="text-sm font-bold text-ink"><%= t("subscriptions.show.plan_change_title") %></h2>
+  <p class="mt-2 text-sm leading-relaxed text-muted"><%= t("subscriptions.show.plan_change_notice") %></p>
+  <ul class="mt-2 list-disc space-y-1 pl-4 text-xs leading-relaxed text-muted">
+    <li><%= t("subscriptions.show.plan_upgrade_notice") %></li>
+    <li><%= t("subscriptions.show.plan_downgrade_notice") %></li>
+  </ul>
+<% end %>
+
+<%# 결제 등록 안내 — v1.0: 실제 수동 결제 등록은 관리자(A3) 경유 %>
+<%= render layout: "shared/card", locals: { class: "p-5" } do %>
+  <h2 class="text-sm font-bold text-ink"><%= t("subscriptions.show.manual_payment_title") %></h2>
+  <p class="mt-2 text-sm leading-relaxed text-muted"><%= t("subscriptions.show.manual_payment_notice") %></p>
+<% end %>

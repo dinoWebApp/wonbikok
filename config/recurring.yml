@@ -1,5 +1,5 @@
-# Solid Queue recurring jobs (원비콕 W2 배치).
-# MSG-006: 리마인더 발송은 오전 9~10시, 야간 발송 금지 → reminder_dispatch 09:00 고정.
+# Solid Queue recurring jobs (원비콕 W2 배치 + W4 구독 배치).
+# MSG-006: 리마인더 발송은 오전 9~10시, 야간 발송 금지 → 리마인더 09:00, 구독 잡은 그 뒤 분산.
 production:
   monthly_invoice_generation:
     class: MonthlyInvoiceGenerationJob
@@ -9,6 +9,22 @@ production:
     class: ReminderDispatchJob
     queue: default
     schedule: "0 9 * * *"
+
+  # ------------------------------------------------------------------
+  # 구독 배치 (W4 F8 — SUB-002/003/004, 매일 오전 — 야간 발송 금지 준수)
+  # ------------------------------------------------------------------
+  subscription_trial_reminder:
+    class: SubscriptionTrialReminderJob # 체험 만료 D-7 알림(SIMULATED — SUB-004)
+    queue: default
+    schedule: "10 9 * * *"
+  subscription_trial_expire:
+    class: SubscriptionTrialExpireJob # 체험 만료 → past_due 전이(SUB-003 진입, 멱등)
+    queue: default
+    schedule: "20 9 * * *"
+  subscription_downgrade_apply:
+    class: SubscriptionDowngradeApplyJob # 대기 중 플랜 하향 확정(기간 경과분, 멱등)
+    queue: default
+    schedule: "30 9 * * *"
 
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"

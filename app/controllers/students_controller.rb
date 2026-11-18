@@ -1,7 +1,7 @@
 # 원생 관리 컨트롤러 (W1 F2).
 # 모든 조회는 current_tenant 스코프 경유(TEN-001). 전화번호는 masked_phone으로만
 # 표시(TEN-003). 청구·발행 이력은 W2 이후 제공 — 현재는 빈 상태 안내.
-# 플랜 원생 수 상한 초과 체크(SUB-001)는 W4 구현 예정 — 이 컨트롤러에는 미반영.
+# SUB-001(W4 F8): 플랜 원생 수 상한 초과 시 신규 등록 차단 — 기존 원생 데이터는 유지.
 class StudentsController < ApplicationController
   MAX_IMPORT_FILE_BYTES = 1.megabyte
 
@@ -23,6 +23,17 @@ class StudentsController < ApplicationController
 
   def create
     @student = current_tenant.students.build(student_params)
+
+    # SUB-001: 플랜 원생 수 상한 초과 시 신규 등록 차단(기존 원생 데이터는 유지).
+    # 집계 기준은 재원(active) 원생 — 휴원·퇴원은 청구 대상 외(INV-004)이므로 상한 미산정.
+    # 구독 부재(W4 이전 가입 레거시)는 통과 — 상한 게이팅 없음.
+    if students_limit_reached?
+      flash.now[:alert] = t("students.errors.plan_limit_reached",
+                            current_count: current_tenant.students.active.count,
+                            limit: @subscription_limit)
+      render :new, status: :unprocessable_entity
+      return
+    end
 
     # 저장 전 유사 이름·연락처 중복 확인(형제 등록 허용, 확인 절차만 수행)
     unless duplicates_confirmed?
@@ -77,7 +88,25 @@ class StudentsController < ApplicationController
       return render :import_new, status: :unprocessable_entity
     end
 
-    @result = StudentsCsvImportService.new(tenant: current_tenant, upload: upload).call
+    # SUB-001(C-1): 재원 슬롯이 0이면 업로드 자체를 422로 차단(서비스 행 단위 가드와 이중 방어).
+    # 구독 부재(레거시)는 remaining nil — 통과.
+    remaining = remaining_active_slots
+    if remaining&.zero?
+      @result = StudentsCsvImportService::Result.new(
+        success_count: 0,
+        errors: [ StudentsCsvImportService::ImportError.new(
+          line: 0, row_values: [],
+          reasons: [ t("students.errors.plan_limit_reached",
+                       current_count: current_tenant.students.active.count,
+                       limit: @subscription_limit) ]
+        ) ]
+      )
+      store_import_errors(@result.errors)
+      return render :import_result, status: :unprocessable_entity
+    end
+
+    @result = StudentsCsvImportService.new(tenant: current_tenant, upload: upload,
+                                           remaining_active_slots: remaining).call
     store_import_errors(@result.errors)
     if @result.errors.any?
       render :import_result, status: :unprocessable_entity
@@ -124,6 +153,22 @@ class StudentsController < ApplicationController
 
   def set_student
     @student = current_tenant.students.includes(:guardians).find(params[:id]) # TEN-001
+  end
+
+  # SUB-001 가드용 잔여 재원(active) 슬롯 — 구독 부재(레거시)는 nil(상한 게이팅 없음).
+  # create·import(C-1) 양 경로가 공용. 집계 기준은 재원 원생(TEN-001 스코프).
+  def remaining_active_slots
+    subscription = Subscription.find_by(tenant_id: current_tenant.id)
+    return nil if subscription.nil?
+
+    @subscription_limit = subscription.students_limit
+    [ @subscription_limit - current_tenant.students.active.count, 0 ].max
+  end
+
+  # SUB-001 가드 — 구독(tenant 1:1) 기준 재원 원생 상한 판정. 구독 부재(레거시)는 false.
+  def students_limit_reached?
+    remaining = remaining_active_slots
+    remaining.present? && remaining.zero?
   end
 
   def filtered_students
