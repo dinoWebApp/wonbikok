@@ -1,75 +1,105 @@
 {
-  "domain": "f5-cash-receipt-barobill",
+  "domain": "f4-f9-parallel",
   "currentPhase": null,
-  "pipelineType": "full",
-  "mode": "lite",
+  "pipelineType": "parallel",
+  "mode": "normal",
+  "parallelTasks": [
+    {
+      "id": "f4",
+      "files": [
+        "app/models/payment.rb",
+        "app/services/payments/",
+        "app/controllers/payments_controller.rb",
+        "app/views/payments/",
+        "test/**/payment*"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "f9",
+      "files": [
+        "app/controllers/billing_links_controller.rb",
+        "app/services/billing_links/",
+        "app/javascript/controllers/clipboard_controller.js",
+        "app/views/billing_links/",
+        "test/**/billing_link*"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "integ",
+      "files": [
+        "db/migrate/(신규 1)",
+        "config/routes.rb",
+        "config/locales/ko.yml",
+        "app/models/invoice.rb",
+        "app/views/invoices/index.html.erb"
+      ],
+      "status": "completed"
+    }
+  ],
   "phaseHistory": [
     {
       "phase": "0",
       "status": "completed",
-      "note": "컨텍스트 확인 — progress null, workspace 롤오버(_workspace_prev2, mv 함정 회피), git clean, 규모=Full"
+      "note": "컨텍스트 확인 — progress null·git clean·workspace 롤오버(_workspace_prev3), payments 테이블 부재·Triggerable/PAID enum 선행 확인"
     },
     {
-      "phase": "1",
+      "phase": "1-P",
       "status": "completed",
-      "note": "요구사항 분석 — PRD F5·F4 경계·9.2 상태·10장·CR-001~007 확인, 바로빌 API 매핑(공식 문서 확정분), F4는 훅 인터페이스+수동 발행으로 대체, 01_plan.md 작성"
+      "note": "분해·판정 — f4∥f9 병렬 판정 3조건 충족, 공유 파일 전부 3-S 통합 배정, 01_plan.md 작성"
     },
     {
       "phase": "2",
       "status": "completed",
-      "note": "PRD v2.5 — 10.2 바로빌 섹션 신설·F5/F1/15/18/19/20장 포트원→바로빌, 14장 W3 F5 확정 블록, AGENTS 6건, 스킬 하드 룰 7. 02_prd_update.md"
+      "note": "PRD v2.6 — 14장 W3 F4/F9 확정 블록(자동발행=완납 시점 1회 정책 확정), 02_prd_update.md"
     },
     {
-      "phase": "3",
+      "phase": "3-P",
       "status": "completed",
-      "note": "developer-lite 구현 — 신규 19+수정 11파일, 마이그레이션 통합 1회, SOAP Net::HTTP 직접 규격, SIMULATED(BAROBILL_LIVE=1 게이트), 214 runs 0 실패"
+      "note": "f4(신규 11파일·테스트 39건) ∥ f9(신규 9파일·테스트 20건) — 화이트리스트 준수 확인 보고"
+    },
+    {
+      "phase": "3-S",
+      "status": "completed",
+      "note": "통합 — 마이그레이션 1회·routes·ko.yml 98키·invoice.rb(has_many·cancel!폐기·remindable PARTIALLY_PAID)·invoices 뷰·F3 링크 주입, 300 runs 0 실패"
     },
     {
       "phase": "4",
       "status": "completed",
-      "note": "오케스트레이터 직접 재검증 — rubocop 112파일 0 / brakeman 0 / 214 runs 0 실패"
+      "note": "오케스트레이터 재검증 — rubocop 126파일 0 / brakeman 0 / 300 runs 0 실패"
     },
     {
       "phase": "5",
       "status": "completed",
-      "note": "reviewer-lite CHANGES_REQUESTED — B2·C6·W8, 05_review.md 저장, Phase 6 수정 위임"
+      "note": "reviewer CHANGES_REQUESTED — CRITICAL 2(오체크 취소 UI 진입 부재·CANCELLED 링크 발급 가드 부재)·WARNING 6"
     },
     {
       "phase": "6",
       "status": "completed",
-      "note": "developer-lite 수정 — B1·B2·C1~C6·W1/W2/W6/W8 전건 + W3/4/5/7 문서화, 229 runs 0 실패(+15)"
+      "note": "C1(수납 이력 섹션+행별 취소 진입)·C2(TokenService CANCELLED 가드+컨트롤러 거부)·W7 READY 포함·W8 DRAFT 가드·f4 테스트 require 누락 복구 — 306 runs 0 실패"
     },
     {
       "phase": "5",
       "status": "completed",
-      "note": "2차 리뷰 CHANGES_REQUESTED — 잔여 R1·R2(폴링/재시도 생명주기)·W-N 문서화, 3차 APPROVED 예상"
+      "note": "2차 재검증 APPROVED — C1·C2 해소(라인 근거), WARNING 후속 과제 기록"
     },
     {
-      "phase": "6",
+      "phase": "7-S",
       "status": "completed",
-      "note": "2차 수정 — R1(cancel_pending 폴링 지속)·R2(pending 복귀 재발행)·경미 문구, W-N 문서화, 230 runs 0 실패"
-    },
-    {
-      "phase": "5",
-      "status": "completed",
-      "note": "3차 재검증 APPROVED — R1·R2 해소 확인, WARNING W3-R(테스트 스텁)·W4-R(복구 액션) 차기 병행 권장"
-    },
-    {
-      "phase": "7",
-      "status": "completed",
-      "note": "tester-lite — W3-R 해소(스텁 호출 횟수 기반, 재발행 직접 검증)·C1 시퀀스 보강, 231 runs 0 실패"
+      "note": "tester — 보강 6건(PAY-002 E2E·CR-002 1회성·부분납→완납), 312 runs 0 실패"
     },
     {
       "phase": "8",
       "status": "completed",
-      "note": "Puma 8.1.1 부트 정상, /·/session/new 200·/dashboard·/cash_receipts 302(비인증), 오류 0건. 스파이크 보류(사업자정보 필요)"
+      "note": "부트 정상·/ 200·/b/무효토큰 404(LNK-003)·/payments·/cash_receipts 302·오류 0건"
     },
     {
       "phase": "9",
       "status": "completed",
-      "note": "AGENTS.md W3 행 갱신(F5 완료 표기), memory 갱신, 완료 보고 — 커밋은 git-deploy 스킬 절차로 사용자 확인 대기"
+      "note": "AGENTS.md W3 완료 갱신·memory(w3-completion)·완료 보고 — 커밋은 git-deploy 절차로 대기"
     }
   ],
   "awaitingApprovalPlan": "_workspace/01_plan.md",
-  "lastUpdated": "2026-11-16T13:40:00+09:00"
+  "lastUpdated": "2026-11-18T14:10:00+09:00"
 }

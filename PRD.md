@@ -2,8 +2,8 @@
 
 | 문서 정보 | 내용 |
 |---|---|
-| 문서 버전 | v2.5 (F5 현금영수증 바로빌 연동 전환 반영) |
-| 작성일 | 2026-10-20 (7장·10장·14장 최종 수정 2026-11-16) |
+| 문서 버전 | v2.6 (F4 입금 확인·F9 청구 링크 구현 확정 반영) |
+| 작성일 | 2026-10-20 (14장 최종 수정 2026-11-18) |
 | 상태 | 확정 — 개발 착수 |
 | 용도 | 1인 개발·운영용 실행 스펙 (외부 공유 전 별도 정리 필요) |
 | 적용 범위 | v1.0 MVP 상세 명세 + 학부모용 페이지 명세 + 외부 연동 명세 + 관리자 페이지 명세 + 랜딩페이지 기획 + 디자인 가이드 + 로드맵 |
@@ -833,7 +833,8 @@
 
 실제 DB 스키마는 구현 단계에서 설계한다. **W1 구현 확정 사항(2026-10-20)**: 원장 인증은 휴대폰번호+비밀번호(bcrypt, Rails 8 세션 기반) — 포트원 본인인증은 W3 이후 도입(20장 오픈 이슈 8). 휴대폰번호는 Active Record Encryption으로 저장하고 검색용 last4 보조 컬럼을 둔다. 금액 컬럼은 원 단위 integer. 상태 컬럼은 9장의 문자열 값을 그대로 저장한다. Guardian은 1:N 설계이며 MVP 화면은 대표 보호자 1명을 다룬다. Tenant에는 practice(연습 모드)·onboarding_step(이탈 재개) 필드를 둔다.
 **W2 구현 확정 사항(2026-10-20)**: Invoice는 확정 시점 스냅샷(원생명·기본 원비)과 조정액·비고·due_on을 보유하며 [student_id, target_month] 유니크 제약으로 INV-001을 강제한다. MessageLog는 channel(알림톡/SMS)·template_type·status(9.3)·provider_message_id·error_code·resend_of를 기록하고 [invoice_id, template_type] 발송 유일성을 갖는다(명시적 재발송은 resend_of로 연결·예외). 솔라피 Messages v4 연동 — 발송 요청 응답 기반 상태 기록(수신 리포트 폴링·웹훅은 P1), 알림톡 실패 시 대체발송(SMS/LMS)을 단일 요청으로 위임.
-**W3 F5 구현 확정 사항(2026-11-16)**: 발급대행은 바로빌(SOAP — CERTKEY+회원사 CorpNum/UserID). cash_receipts 테이블은 mgt_key 유니크 제약으로 CR-001을 강제하고 identity_num은 암호화 저장, barobill_state(정수)·nts_confirm_num·retry_count를 둔다. tenants에 biz_tel·biz_type·email·barobill_member_id(불변) 추가 — RegistCorp 필수 항목. guardians.business_number(암호화, 지급증명용), students.cash_receipt_issue_type(원생별 선택). 어댑터는 환경별 키·엔드포인트 쌍 분기(운영 ws/테스트 testws), cert_key 공백 시 SIMULATED. TradeDate D-1 제약으로 전월 소급 발행 불가 — 월 넘김 입금건은 재안내 처리. F4 입금확인 트리거는 `CashReceipt::Triggerable` 인터페이스로 정의하며 F5 단독 실행 시 수동 발행 경로로 검증한다. W2 미납 임시 판정 규칙: SENT 상태 & due_on 경과 & 완납 기록 없음(Payment 도입 W3에서 확장). 리마인더 설정은 tenants 컬럼(톤·단계별 ON/OFF·발송 시각), 원생별 제외는 students.excluded_from_reminders. 연습 모드·연동 키 미설정 시 발송은 SIMULATED로 기록한다.
+**W3 F5 구현 확정 사항(2026-11-16)**: 발급대행은 바로빌(SOAP — CERTKEY+회원사 CorpNum/UserID). cash_receipts 테이블은 mgt_key 유니크 제약으로 CR-001을 강제하고 identity_num은 암호화 저장, barobill_state(정수)·nts_confirm_num·retry_count를 둔다. tenants에 biz_tel·biz_type·email·barobill_member_id(불변) 추가 — RegistCorp 필수 항목. guardians.business_number(암호화, 지급증명용), students.cash_receipt_issue_type(원생별 선택). 어댑터는 환경별 키·엔드포인트 쌍 분기(운영 ws/테스트 testws), cert_key 공백 시 SIMULATED. TradeDate D-1 제약으로 전월 소급 발행 불가 — 월 넘김 입금건은 재안내 처리. F4 입금확인 트리거는 `CashReceipt::Triggerable` 인터페이스로 정의하며 F5 단독 실행 시 수동 발행 경로로 검증한다.
+**W3 F4/F9 구현 확정 사항(2026-11-18)**: Payment 테이블(invoice_id·tenant_id·amount·paid_on·method·memo·status[active/cancelled]·cancel_reason·cancelled_at·confirmed_by·confirmed_at) — 마이그레이션 통합 1회 생성. 입금 확인(체크)은 `Payments::ConfirmService`가 전액/부분을 처리하고 invoice 상태를 PAID/PARTIALLY_PAID로 전이하며, **자동발행은 완납(PAID) 시점에만 `Triggerable origin: :auto` 1회 호출**(부분납 상태에서는 자동발행 보류 — 원장 수동 발행은 허용, PAY-004·CR-002 정책 확정). 오체크 취소는 Payment 취소 이력 + invoice 상태 재계산(삭제 아님, PAY-002). 매칭 힌트는 금액·원생명 기반 추천 전용(PAY-003). 청구 링크는 invoices.public_token(예측 불가 토큰·유니크) + 발급/취소 시각 컬럼 — `/b/{token}` 공개 라우트(비로그인). 공개 페이지 표시는 교습소명·문의처(원터치 발신)·금액(스냅샷)·내역·납부 기한·납부 상태·계좌 복사 원탭·현금영수증 자동발급 안내로 한정(LNK-002 노출 최소), 납부 상태는 invoice.status 기반(납부 전/확인 중/납부 완료). 접근 로그(LNK-004)는 A4/A9 착수 시 연계. W2 미납 임시 판정 규칙: SENT 상태 & due_on 경과 & 완납 기록 없음(Payment 도입 W3에서 확장). 리마인더 설정은 tenants 컬럼(톤·단계별 ON/OFF·발송 시각), 원생별 제외는 students.excluded_from_reminders. 연습 모드·연동 키 미설정 시 발송은 SIMULATED로 기록한다.
 
 | 개체 | 목적 | 주요 항목 예시 |
 |---|---|---|
