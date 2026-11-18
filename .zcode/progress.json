@@ -1,28 +1,44 @@
 {
-  "domain": "f4-f9-parallel",
+  "domain": "w4-f7-f8-admin-parallel",
   "currentPhase": null,
   "pipelineType": "parallel",
   "mode": "normal",
   "parallelTasks": [
     {
-      "id": "f4",
+      "id": "f7",
       "files": [
-        "app/models/payment.rb",
-        "app/services/payments/",
-        "app/controllers/payments_controller.rb",
-        "app/views/payments/",
-        "test/**/payment*"
+        "app/controllers/dashboard_controller.rb",
+        "app/views/dashboard/",
+        "app/services/dashboard/",
+        "app/views/students/show.html.erb",
+        "test/**/dashboard*"
       ],
       "status": "completed"
     },
     {
-      "id": "f9",
+      "id": "f8",
       "files": [
-        "app/controllers/billing_links_controller.rb",
-        "app/services/billing_links/",
-        "app/javascript/controllers/clipboard_controller.js",
-        "app/views/billing_links/",
-        "test/**/billing_link*"
+        "app/models/subscription.rb",
+        "app/services/subscriptions/",
+        "app/services/portone/",
+        "app/controllers/subscriptions_controller.rb",
+        "app/views/subscriptions/",
+        "app/controllers/students_controller.rb",
+        "app/controllers/registrations_controller.rb",
+        "test/**/subscription*"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "admin",
+      "files": [
+        "app/models/admin_user.rb",
+        "app/models/audit_log.rb",
+        "app/controllers/admin/",
+        "app/views/admin/",
+        "app/views/layouts/admin.html.erb",
+        "app/services/admin/",
+        "test/**/admin*"
       ],
       "status": "completed"
     },
@@ -32,8 +48,8 @@
         "db/migrate/(신규 1)",
         "config/routes.rb",
         "config/locales/ko.yml",
-        "app/models/invoice.rb",
-        "app/views/invoices/index.html.erb"
+        "config/recurring.yml",
+        "app/views/layouts/application.html.erb"
       ],
       "status": "completed"
     }
@@ -42,64 +58,64 @@
     {
       "phase": "0",
       "status": "completed",
-      "note": "컨텍스트 확인 — progress null·git clean·workspace 롤오버(_workspace_prev3), payments 테이블 부재·Triggerable/PAID enum 선행 확인"
+      "note": "컨텍스트 확인 — progress null·git clean·롤오버(_workspace_prev4), F7/F8/12장 A0~A3·SUB/ADM·11장 조사"
     },
     {
       "phase": "1-P",
       "status": "completed",
-      "note": "분해·판정 — f4∥f9 병렬 판정 3조건 충족, 공유 파일 전부 3-S 통합 배정, 01_plan.md 작성"
+      "note": "분해·판정 — f7∥f8∥admin 3그룹(상한 3), Subscription 시그니처 사전 고정으로 의존 해소, F8 실결제 SIMULATED·F7 PDF 후속, 01_plan.md"
     },
     {
       "phase": "2",
       "status": "completed",
-      "note": "PRD v2.6 — 14장 W3 F4/F9 확정 블록(자동발행=완납 시점 1회 정책 확정), 02_prd_update.md"
+      "note": "PRD v2.7 — 14장 W4 확정 블록(Subscription·subscription_events·F8 SIMULATED·AdminUser OTP·축소), 02_prd_update.md"
     },
     {
       "phase": "3-P",
       "status": "completed",
-      "note": "f4(신규 11파일·테스트 39건) ∥ f9(신규 9파일·테스트 20건) — 화이트리스트 준수 확인 보고"
+      "note": "f7(대시보드·산식 확정) ∥ f8(Subscription·SIMULATED 15건 스cratch 검증) ∥ admin(A0~A3·TOTP RFC6238) — 화이트리스트 준수 보고"
     },
     {
       "phase": "3-S",
       "status": "completed",
-      "note": "통합 — 마이그레이션 1회·routes·ko.yml 98키·invoice.rb(has_many·cancel!폐기·remindable PARTIALLY_PAID)·invoices 뷰·F3 링크 주입, 300 runs 0 실패"
+      "note": "통합 — 마이그레이션 1회(4테이블)·routes·ko.yml 300+키·recurring 3잡·enum/has_many 결선·조정 18건, 480 runs 0 실패"
     },
     {
       "phase": "4",
       "status": "completed",
-      "note": "오케스트레이터 재검증 — rubocop 126파일 0 / brakeman 0 / 300 runs 0 실패"
+      "note": "오케스트레이터 재검증 — rubocop 170파일 0 / brakeman 0 / 480 runs 0 실패"
     },
     {
       "phase": "5",
       "status": "completed",
-      "note": "reviewer CHANGES_REQUESTED — CRITICAL 2(오체크 취소 UI 진입 부재·CANCELLED 링크 발급 가드 부재)·WARNING 6"
+      "note": "reviewer CHANGES_REQUESTED — C-1(CSV 상한 우회)·C-2(trial_extended i18n 누락)·W8, 14항목 중 12 통과"
     },
     {
       "phase": "6",
       "status": "completed",
-      "note": "C1(수납 이력 섹션+행별 취소 진입)·C2(TokenService CANCELLED 가드+컨트롤러 거부)·W7 READY 포함·W8 DRAFT 가드·f4 테스트 require 누락 복구 — 306 runs 0 실패"
+      "note": "C-1(remaining_active_slots 이중 방어)·C-2(i18n+전수 테스트)+W1/2/3/5/7·경미 — 485 runs 0 실패"
     },
     {
       "phase": "5",
       "status": "completed",
-      "note": "2차 재검증 APPROVED — C1·C2 해소(라인 근거), WARNING 후속 과제 기록"
+      "note": "2차 재검증 APPROVED(루프 1회차) — C-1·C-2·W 전건 해소 라인 근거 확인"
     },
     {
       "phase": "7-S",
       "status": "completed",
-      "note": "tester — 보강 6건(PAY-002 E2E·CR-002 1회성·부분납→완납), 312 runs 0 실패"
+      "note": "tester — 보강 5건+강화 3파일(audit 미기록 단정·마스킹 상세·trial_extended 렌더·미확인 입금 일치), 490 runs 0 실패"
     },
     {
       "phase": "8",
       "status": "completed",
-      "note": "부트 정상·/ 200·/b/무효토큰 404(LNK-003)·/payments·/cash_receipts 302·오류 0건"
+      "note": "부트 정상·/admin/session/new 200·subscription·admin·report 게이트 302·오류 0건(1차 오류 1건은 검증자 경로 오휴)"
     },
     {
       "phase": "9",
       "status": "completed",
-      "note": "AGENTS.md W3 완료 갱신·memory(w3-completion)·완료 보고 — 커밋은 git-deploy 절차로 대기"
+      "note": "AGENTS.md W4 행 갱신·memory(w4-progress)·완료 보고 — 커밋은 git-deploy 절차로 대기"
     }
   ],
   "awaitingApprovalPlan": "_workspace/01_plan.md",
-  "lastUpdated": "2026-11-18T14:10:00+09:00"
+  "lastUpdated": "2026-11-18T20:40:00+09:00"
 }
