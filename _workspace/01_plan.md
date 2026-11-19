@@ -1,70 +1,119 @@
-# 01_plan.md — W4 병렬 배치: F7 대시보드 + F8 구독·결제 + 관리자 A1·A2·A3
+# 01_plan.md — 영업 직원·오피서 추천 시스템 (sales/officer 이중 역할)
 
-- 작성일: 2026-11-18
-- 파이프라인: **병렬 배치 (§6.14)** — `0 → 1-P → ✋승인(배치 1회) → 2 → 3-P(f7∥f8∥admin, 상한 3) → 3-S(통합) → 4 → 5 → 6? → 7-P? → 7-S → 8 → 9`
-- 프로필(일반 모드): wonbikok-developer / wonbikok-reviewer / wonbikok-tester
-- A5(현금영수증 발행 관리)는 본 배치 제외 — A1·A2·A3 이후 별도 태스크(AGENTS 후보 조합 준수)
+- 작성일: 2026-11-19
+- 모드: 일반(`/wonbikok_orchestrator`) — wonbikok-developer/reviewer/tester
+- 파이프라인: **Full 직렬** (0→1→✋→2→3→4→5→6?→7→8→9) — 가입 인증↔추천 코드↔첫 결제 할인↔수수료가
+  하나의 가입·결제 체인으로 순차 결합하므로 병렬 분해 부적합(공유: registrations·PaymentService·ko.yml·routes)
 
-## 0. 범위 확정 결정 (오케스트레이터 판단 — 승인 대상)
+## 1. 기획 검토 — 업계 표준 기준 설계 제안
 
-1. **F8 v1.0 최소형**: PRD "정기결제 도입 전(P1 이전) 수동 결제·파일럿 무료 운영 대체 가능" 조항 채택 —
-   실제 카드 결제·빌링키 발급은 **포트원 어댑터 SIMULATED**(바로빌/솔라피 패턴 준용, 포트원 키 미등록).
-   구현: Subscription 도메인(30일 체험 자동 시작·플랜·상태 전이)·SUB-001 상한 차단·D-7 알림(Recurring·
-   SIMULATED)·수동 결제 기록·결제 실패 재시도 프레임(상태 전이 중심).
-2. **F7 PDF 저장은 후속 과제** — 마감 리포트는 HTML 화면으로 구현(Node/npm 없는 스택에서 PDF 젬
-   선정[prawn 등]·플랜 게이팅은 F8 상태 의존이라 별도 태스크로 분리).
-3. **관리자 OTP**: A0 이메일+비밀번호+2단계 인증 — 로컬/1인 운영에 맞는 **사전 공유 시크릿 기반 6자리
-   TOTP 간단 구현**(외부 젬 불필요 수준, 데이터 모델은 확장 가능 설계). 별도 주소는 라우트 네임스페이스로
-   분리(운영 배포 시 서브도메인 격리 가능 구조).
-4. **A2·A3의 Subscription 참조**: 병렬 의존 해소를 위해 **Subscription 시그니처를 본 플랜에서 사전 고정**
-   (아래 §2) — admin 태스크는 이 가정으로 작성, 3-S에서 대조·결선(F4/F9 성공 패턴).
+### 1.1 수수료 구조 (업계 표준 조사 기반)
 
-## 1. 태스크 분해·소유권 표
+| 모델 | 업계 통례 | 채택 여부 |
+|---|---|---|
+| 1회성 레퍼럴 보너스 | 첫 결제액의 20~30% 1회 (Dropbox·몇몇 B2C) | ✗ — 요구사항이 "결제액 중 일정 비율 지속" |
+| **Recurring 커미션** | 월 결제액의 10~20% · 12개월~평생 (B2B SaaS 제휴·리셀러 표준: PartnerStack 15~25%·국내 SaaS 제휴 10~20%) | ✅ **채택** |
 
-| task | 범위 | 소유 파일 | 공유(3-S) |
-|---|---|---|---|
-| **f7** 마감 대시보드 | 이번 달 청구/수납/미납/납부율+기준 명시·오늘 할 일(미확인 입금·발행 실패·리마인더 예정) 상단·빠른 작업·미발행 잔여 경고(월말 가산세 문구)·마감 리포트 HTML·원생별 수납 이력(students/show)·빈 상태 온보딩 | `app/controllers/dashboard_controller.rb`(수정)·`app/views/dashboard/*`(수정)·`app/services/dashboard/summary_service.rb`(신규)·`app/views/students/show.html.erb`(수정 — 이력 섹션만)·`test/services/dashboard/*`·`test/controllers/dashboard_controller_test.rb` | routes·ko.yml |
-| **f8** 구독·결제 | Subscription(§2 시그니처)·가입 시 30일 체험 자동 시작·SUB-001 원생 상한 차단(students create 가드)·플랜 표시·수동 결제 등록(사유)·결제 실패 3회 재시도 상태 프레임(SUB-002)·체험 D-7 알림 Job(SIMULATED)·구독 화면(플랜·상태·결제 이력) | `app/models/subscription.rb`·`app/services/subscriptions/*`(trial_start·plan_change·payment_record·retry_policy)·`app/services/portone/billing_service.rb`(SIMULATED)·`app/controllers/subscriptions_controller.rb`·`app/views/subscriptions/*`·`app/controllers/students_controller.rb`(수정 — 상한 가드만)·`app/controllers/registrations_controller.rb`(수정 — 체험 시작 훅만)·`test/**` | 마이그레이션·routes·ko.yml·`config/recurring.yml` |
-| **admin** A1·A2·A3 | A0 공통(AdminUser 이메일+비밀번호+OTP·감사 로그·마스킹 원칙)·A1 운영 대시보드(24h 실패·지표·대응 대기 큐)·A2 이용자 관리(통합 검색·상세·이벤트 타임라인·조치[플랜 변경·체험 연장 30/60 상한·정지] — ADM-001 사유 필수)·A3 구독·결제 관리(결제 이력·실패 모니터링 D+30 카운트다운·환불 분기·매출 집계) | `app/models/admin_user.rb`·`app/models/audit_log.rb`·`app/controllers/admin/`(base·sessions·dashboards·tenants·subscription_payments)·`app/views/admin/**`·`app/views/layouts/admin.html.erb`·`app/services/admin/`(tenant_timeline·refund_policy)·`test/**` | 마이그레이션·routes(`Admin::`)·ko.yml |
-| **integ**(3-S) | 마이그레이션 **1회**: subscriptions·admin_users·audit_logs / routes 결선(subscriptions 리소스·Admin 네임스페이스·대시보드는 기존) / ko.yml 병합 / `config/recurring.yml`(체험 D-7·필요시 결제 재시도 배치) / Subscription 시그니처 대조(f8 vs admin 가정) / 앱 레이아웃 네비에 구독 진입 추가 / 전체 게이트 선행 | — | 전부 |
+**확정(2026-11-19 사용자 수정 요청 반영): 두 역할 체계 — 단일 `sales_reps` 테이블 + `role` 컬럼**
 
-## 2. Subscription 시그니처 사전 고정 (f8·admin 공통 가정 — 3-S 대조 기준)
+| | **sales 역할** (영업 직원) | **officer 역할** (지인·감투용) |
+|---|---|---|
+| 수수료 | **20%** | **15%** |
+| 지급 기간 | **12개월 캡** (피판매 테넌트 가입일로부터 12개월 내 결제분만 집계) | **무기한** (구독 유지 중 계속) |
+| 타이틀 | 표시용 자유 텍스트("영업 이사" 등 — 대시보드 노출) | 표시용 자유 텍스트("CRO" 등 — 대시보드 노출) |
+| 계정·코드·대시보드 | 동일 체계 — 같은 sales_reps 테이블·같은 추천 코드 로테이션·같은 /sales 대시보드 | 〃 |
 
-- 컬럼: `tenant_id(유니크)`·`plan(light/standard)`·`status(trial/active/past_due/suspended/cancelled)`·
-  `trial_started_at`·`trial_ends_at`·`current_period_start`·`current_period_end`·`cancel_scheduled_at`
-- 메서드(예상): `trial_remain_days`·`plan_limit(:students)`→ {light: 30, standard: 70}·`trial_expiring?(days:)`
-- 수동 결제 기록은 `subscription_payments` 대신 **본 배치에서 Subscription에 1:N `admin/payment_records`?
-  → 단순화: `PaymentRecord` 모델 추가는 과대 — A3 결제 이력은 `SubscriptionEvent` 이벤트 소스(타입:
-  trial_started/manual_payment/payment_failed/retry/past_due/suspended/plan_changed/refund)로 통일 —
-  **이벤트 타임라인(A2)과 결제 이력(A3)을 동일 테이블 `subscription_events`로 서빙**(생성: f8 도메인 서비스)
-- 포트원 빌링키: 실발급 SIMULATED — `billing_key_uid` 컬럼은 v1.0 제외(필요 시 P1 추가)
+- `commission_rate`(역할 기본값 sales 0.20 / officer 0.15 — 관리자가 0.05~0.30 범위 조정 가능)·
+  `commission_cap_months`(sales 12 / officer nil=무기한)
+- **지급 주기: 월 단위 후불** — "이번달 수령액 = 저번달(전월) 확정 결제액 × 비율"
+- 수수료 발생 기준: **실제 징수된 manual_payment 금액**(할인 후·취소 제외 — SUB-005 정합)
+- 12개월 캡 판정: 피판매 테넌트의 `created_at`(가입일) 기준 — 결제 시점이 캡 내인 경우만 ledger 생성
 
-## 3. 병렬 판정 (3조건)
+### 1.2 첫 결제 20% 할인
 
-1. 소유권 분리: 위 표 — 교차 없음(students_controller=f8·students/show 뷰=f7으로 분리 배정) ✅
-2. 의존 없음: f7은 기존 도메인(invoices·payments·cash_receipts) 읽기만·admin은 Subscription §2 가정 ✅
-3. 공유 파일 비수정: routes·마이그레이션·ko.yml·recurring.yml·레이아웃 전부 3-S ✅
+- 적용점: 피추천 테넌트의 **첫 번째 유료 결제 1회 · 20% 할인**(2026-11-19 사용자 확정 — 할인 후 금액 징수·원가·할인액 기록) — 이후 정상가
+- F8 v1.0(수동 결제) 구조에서 `PaymentService` 금액 산정에 적용 — P1 포트원 실결제 전환 시 동일 규칙 이관
+- 멱등: 테넌트당 1회(`first_payment_discounted_at` 타임스탬프)
 
-## 4. fan-out 공통 제약 (각 Developer 프롬프트 포함)
+### 1.3 추천 코드 주간 재생성
 
-소유권 화이트리스트·자기 파일 rubocop만·전체 테스트/마이그레이션/서버 기동 금지(3-S 후)·문서 수정 금지·
-컬럼은 §2 가정(불일치는 3-S 대조에서 조정)·Subscription 시그니처 변경 금지(양측 가정 기준).
+- 형식: 직원별 `SecureRandom` 8자(대문자+숫자, 예측 불가)·유효기간 7일
+- **주간 로테이션 잡**(월요일 09:00 — 발송 없는 배치): 기존 코드 만료 → 신규 발급(직원 화면에 항상 유효 코드 1개)
+- 가입 매핑은 **가입 시점 코드 → 직원**(스냅샷 저장)이므로 이후 재생성 영향 없음
+- 남용 방지 보조: 코드 유효성 검증(만료 코드 → 가입 거절)·휴대폰 인증(1.4) 이중 방어
 
-## 5. Phase 2 문서 현행화 (승인 후 직렬 1회)
+### 1.4 휴대폰 인증 가입 (남용 방지)
 
-PRD v2.7: 14장 W4 확정 블록(Subscription·subscription_events·AdminUser·AuditLog 스키마·F8 v1.0 최소형
-범위[실결제 SIMULATED·수동 결제]·F7 PDF 후속·OTP 방식)·11장 파일럿 무료 운영 주석 보강. 02_prd_update.md.
+- 절차: 가입 폼 휴대폰 입력 → **인증번호 6자리 알림톡 발송**(솔라피 — v1.0 SIMULATED·SMS 대체 체계 재사용,
+  실제 카카오 인증 템플릿 심사는 운영 과제) → 5분 내 입력 일치 시에만 가입 진행(시도 5회 제한)
+- **휴대폰 유일**: 기존 User 검증(deterministic 암호화 + 유니크) 그대로 — 중복 가입 차단은 이미 구축됨
+- 인증 레코드: `signup_verifications`(전화·코드·만료·시도·검증완료) — 검증 완료 토큰을 가입 제출에 첨부
 
-## 6. Rule ID
+### 1.5 영업 직원 계정·대시보드
 
-F7: INV/PAY/CR 표시 정합(기존)·SUB-001(f8)·SUB-002/003/004(상태·알림)·ADM-001/002(admin 핵심)·
-TEN-001/003(admin 마스킹·검색)·MSG(이중 전달 표시는 알림 SIMULATED 기록)
+- `SalesStaff`(이메일+비밀번호·status) — 관리자(AdminUser)와 **별도 인증·별도 네임스페이스 `Sales::`**
+  (관리자 권한 없음·OTP 없음 — 제한 계정. 데스크톱/모바일 겸용)
+- 직원 스코프 격리: 본인 피판매 테넌트·본인 수수료만 조회(TEN-001 준용 — 타 직원 데이터 404)
+- 대시보드: 헤더에 **직함(title) 노출** — ①피판매 사용자 목록(가입일·플랜·상태) ②월별 결제액(피판매 전체 집계) ③**이번달 수령 예상
+  (전월 확정 집계 기준)** ④**연도별 누적 수수료**(연도 선택) ⑤현재 유효 추천 코드(복사)
+- 관리자 A2 확장: 영업 직원 CRUD(**role·title·수수료율·캡 개월** 설정 포함·정지 사유 ADM-001)·
+  직원별 수수료 요약(지급 확정[paid] 처리 포함)
+
+## 2. 데이터 모델 (마이그레이션 1회 통합)
+
+- `sales_reps`: name·email(유니크)·password_digest·role(sales/officer)·title(자유 텍스트 직함)·
+  status(active/suspended)·commission_rate(decimal — role 기본 0.20/0.15)·commission_cap_months
+  (sales 12 / officer nil)·suspended_reason·타임스탬프
+- `referral_codes`: sales_staff_id·code(유니크)·expires_at·replaced_at(로테이션 이력 보존)
+- `signup_verifications`: phone_number(정규화·인덱스)·code(해시 저장)·expires_at·attempts·verified_at·consumed_at
+- `commission_ledgers`: sales_staff_id·tenant_id·month(YYYY-MM)·base_amount·rate·amount·status(pending/paid)·
+  paid_at·source_payment_event_id — [sales_staff_id, month] 조회 인덱스
+- `tenants` 추가: referred_by_sales_staff_id·referral_code_snapshot·first_payment_discounted_at
+
+## 3. 구현 범위
+
+### 모델/서비스/잡
+- 모델 4종 + Tenant 확장(association·`referred?`)
+- `Referral::CodeService`(발급·유효검증·주간 로테이션)·`Referral::DiscountService`(첫 결제 할인 계산·적용 1회)
+- `Referral::CommissionService`(결제 시점 ledger 생성[징수액×비율·12개월 만료 확인]·월/연 집계·지급 확정)
+- `Signup::PhoneVerificationService`(코드 생성·솔라피 발송[SIMULATED·MSG 규칙 준수]·검증·시도 제한)
+- `ReferralCodeRotationJob`(주간)·recurring.yml 등록
+
+### 컨트롤러/뷰
+- `Admin::SalesStaffsController`(CRUD·정지 사유 ADM-001·수수료 요약) + admin 뷰(사이드바 항목 추가)
+- `Sales::`(base[인증]·sessions·dashboards) + `layouts/sales` + 직원 대시보드 뷰(§1.5 5종)
+- 가입 플로우 확장: registrations에 인증 단계(발송·검증 액션 — 검증 완료 시에만 create 허용) + 추천 코드 필드(선택)
+- `PaymentService.record_manual!` 확장: 피추천 테넌트 첫 결제 할인 적용 + ledger 생성(원자적)
+
+### 테스트 (외부 실호출 금지 — 솔라피 SIMULATED)
+- REF(신규 Rule — Phase 2에서 PRD 22장 추가): 코드 유효성(만료 거절·주간 로테이션)·할인 20% 1회 멱등·
+  수수료 정합(징수액 기준·12개월 만료·환불 차감[후속 또는 포함])·직원 스코프 격리·인증 완료 후 가입만·
+  시도 5회 제한·휴대폰 유일 회귀
+- 관리자 CRUD·정지 사유·가입 플로우 E2E(인증→코드→가입→첫 결제 할인→ledger)·기존 490건 회귀
+
+## 4. Rule ID
+
+**REF-001~007 신규**(Phase 2 PRD 22장 추가) + TEN-001(스코프 확장)·TEN-002/003(전화 정규화·암호화 기존)·
+ADM-001(정지 사유)·SUB-005(할인·수수료 금액 정합)·MSG(인증 알림톡 SIMULATED·재시도 제한)
+
+## 5. Phase 2 문서 현행화
+
+- PRD v2.8: 7장 신규 F10(영업 직원·추천 시스템 — 첫 결제 20% 할인 명시) 절 신설·12장 A2 확장(직원 CRUD·수수료)·14장 데이터 모델 4종+
+  tenants 컬럼·22장 REF-001~007 신규·11장(할인·커미션 정책 문구 보강)
+- AGENTS.md: 도메인 표에 REF 추가·진행 표는 Phase 9
+
+## 6. 위임 계획 (일반 모드)
+
+| Phase | 프로필 | 산출물 |
+|---|---|---|
+| 3 | wonbikok-developer 1개(직렬 전 범위) | 소스 + `03_implementation.md` |
+| 5 | wonbikok-reviewer | `05_review.md` |
+| 6? | wonbikok-developer | 지적 최소 수정 |
+| 7 | wonbikok-tester | `07_test_report.md` |
 
 ## 7. 리스크
 
-1. Subscription 가정 불일치(f8↔admin) — §2 고정+3-S 대조(F4/F9 성공 패턴 재사용)
-2. 관리자 배치 분량 과대(A0+A1+A2+A3) — 조회 중심 MVP로 축소: A1 지표 중 추이 그래프는 숫자 표로
-   대체(차트 라이브러리 없음·후续), A2 데이터 내보내기는 후속, A3 환불은 정책 분기 표시+기록(실 환불
-   이체는 외부) — 플랜에 명시된 축소만
-3. OTP 구현 오류 — 로그인 잠금 5회·감사 로그와 함께 Reviewer 집중 항목
-4. 체험 D-7 Recurring 잡 — recurring.yml 공유(3-S)·SIMULATED
+1. 가입 플로우 변경으로 기존 회귀(490건) — 인증 단계는 신규 액션 분리로 기존 플로우 최소 변경
+2. 할인·수수료의 금액 정합(SUB-005) — ledger에 원가·할인액·비율 스냅샷 저장·Reviewer 집중
+3. 인증 알림톡 실심사 — v1.0 SIMULATED·운영 과제 명시(카카오 인증 템플릿 별도)
+4. 역할별 수수료 정책(sales 20%/12개월 캡·officer 15%/무기한)은 사용자 확정 — 관리자 필드로 재조정 가능

@@ -1,80 +1,73 @@
-# 05_review.md — W4 병렬 배치 코드 리뷰 (Phase 5, 1차)
+# 05_review.md — F10 추천 시스템 코드 리뷰 (Phase 5, 1차)
 
-- 실행일: 2026-11-18 · 프로필: wonbikok-reviewer · 판정: **CHANGES_REQUESTED (BLOCKER 0 · CRITICAL 2 · WARNING 8)**
-- 게이트 실측: 480 runs 통과·RuboCop 0·Brakeman 0. 도메인 설계(상태 전이 서비스 경유·SIMULATED 이중 게이트·
-  ADM-001 2차 방어·마스킹 단일 경유) 견고.
+- 실행일: 2026-11-19 · 프로필: wonbikok-reviewer · 판정: **CHANGES_REQUESTED (BLOCKER 1 · CRITICAL 0 · WARNING 5)**
+- 게이트 재검증: rubocop 198파일 0·brakeman 0·588 runs 2644 assertions 0 실패(Developer 보고 일치)
 
-## CRITICAL
+## BLOCKER
 
-[C-1] SUB-001 — CSV 일괄 등록 경로 상한 가드 부재 — app/services/students_csv_import_service.rb·students_controller.rb:80-98
-- create에는 가드 있으나 CSV import에 없음 — 라이트(30명) 테넌트가 상한 초과 원생을 CSV로 무제한 등록 가능(플랜 상한 완전 우회).
-- 수정: 서비스에 잔여 슬롯 전달 → 초과 행 오류행 처리("잔여 N명 초과" 사유) 또는 import 액션 잔여 0 시 422 차단 + 테스트 보강.
-
-[C-2] i18n 누락 — subscriptions.events.trial_extended 키 부재 — config/locales/ko.yml·subscriptions/show.html.erb:121
-- integ가 enum에 trial_extended를 추가했으나 ko.yml 미병합 → 관리자 체험 연장 시 원장 구독 화면에 "Translation missing" 렌더(실측 확인).
-- 수정: 키 1줄 추가 + 동적 키 후보(enum 전수) 대조 재발 방지 권장.
+[B-1] Sales 로그인 폼 실제 동작 안 함(REF-005/F10 명세 위반·런타임 에러) —
+  app/views/sales/sessions/new.html.erb:8 vs sales/sessions_controller.rb:17
+- 뷰 `form_with url:`(scope 없음) → 필드가 `name="email"` 최상위로 제출되는데 컨트롤러는
+  `params.expect(sales_session: [...])` → 브라우저 로그인 시마다 ParameterMissing(400). /sales 전체 UI 접근 불능.
+  템플릿 렌더 실증 확인. 테스트 9건이 params를 직접 POST해 뷰 우회 → 588 green이 미검출.
+- 수정: `form_with scope: :sales_session, url: sales_session_path` (1줄) + 뷰 폼 필드 name 검증
+  통합 테스트 1건(렌더 HTML에 sales_session[email] 단정) 추가.
 
 ## WARNING
 
-- W-1 세션 고정: admin sessions create_otp 성공 시 reset_session 후 키 설정 권장(원장 앱 Session 재생성 구조와 대비).
-- W-2 OTP 개발 폴백 시드가 운영에서도 유효 — development/test 한정 또는 production 미설정 시 로그인 거부 권장.
-- W-3 OTP 5회째 잠금 account_locked 감사 이중 기록 — 반환값 일원화.
-- W-4 past_due/suspended 대상 체험 연장이 기능 무효(trial_ends_at만 갱신) — 연장 시 trial 복귀 또는 대상 trial 한정.
-- W-5 청구액 라벨-산식 불일치 — billed_amount는 DRAFT 포함 설계인데 라벨 "확정 청구 합계" — "당월 청구 합계(취소 제외·초안 포함)"로 정정.
-- W-6 A1 지표 3종 드릴다운 미제공 — 후속 목록 명시 추가.
-- W-7 A3 결제 이력 N+1 — includes(subscription: :tenant) 적용 권장.
-- W-8 정지 실차단·suspended 게이팅 부재가 PRD W4 확정 블록 후속 목록에 미기록 — 02_prd_update 추가.
+- W-1 트랜잭션 내부 외부 HTTP — phone_verification_service.rb:37-47 — deliver!가 transaction 블록 내부
+  (SQLite 쓰기 잠금 홀드). create! 커밋 후 deliver! 호출로 의미 동일 유지 권장. 동기 Service 설계 예외 자체는 수용.
+- W-2 뷰 DB 쿼리 — admin/sales_staffs/show.html.erb:169 `@sales_staff.referred_tenants.order(...)` —
+  컨트롤러 prepare_commission_summary로 이관.
+- W-3 N+1 — sales/dashboard_service.rb:27-35 tenant.subscription 행당 쿼리 — includes(:subscription).
+- W-4 금전·이력 dependent: :destroy — sales_rep.rb:23-24 — commission_ledgers(REF-004 append-only)·
+  referral_codes(이력 보존)가 rep 삭제 시 전량 삭제 — restrict_with_exception 권장.
+- W-5 환불 ledger 역분 미구현 — v1.0 refund 기록-only 정합 무해·후속 문서화 확인(03_implementation §5·§7).
 
-기록(수용·조치 불요): AuditLog created_at 옵션(운영 경로 사용 금지 주석 유지)·TimelineService 전체 로드(소규모)·
-month_end_near? 과거 월 참(화면 영향 미미)·active 구독 체험 잔여일 음수 표시(표시 가드 경미).
+## 체크리스트 (12항목)
 
-## 체크리스트 (14항 — 상세 근거는 리뷰 본문)
+1 REF-001 PASS(로테이션 이력 보존·만료 거절 — W-4 유보) / 2 REF-002 PASS(claim! 원자 갱신·경쟁 테스트로 정확히 1회·
+원가/할인액 기록·결제 롤백 시 claim 일관 롤백) / 3 REF-003/004 PASS(캡 경계일 포함·13개월 제외·rate 스냅샷 소급 없음 — W-5 문서화) /
+4 REF-005/007 PASS(단일 경로 스코프·별도 세션 키·정지 3중 방어 — 접근은 B-1로 불능) / 5 REF-006 PASS(DB 원천 검증·
+원자 소비·이중 레이트 리밋·code_digest bcrypt·로그 local 한정) / 6 인증 발송 조건부 PASS(동기 Service 타당 — 잡 인자
+평문 방지·W-1 권장) / 7 PaymentService PASS(비추천 무변경·실패 rescue·트랜잭션 경계) / 8 관리자 CRUD PASS(W-2 유보) /
+9 Sales:: 보안 PASS(잠금·reset_session·CSRF — B-1로 실사 불능) / 10 대시보드 집계 PASS(산식·연도 클램프 — W-3 유보·
+strftime UTC는 기존 관행) / 11 아키텍처·회귀 PASS(verify_signup_phone! 헬퍼 검증 약화 아님 — 강제 경로 별도 검증) /
+12 §5 요청 응답 완료.
 
-1 ADM-001 통과(2차 방어·삭제 경로 부재, W-3 이중 기록) / 2 ADM-002·TEN 통과 / 3 인증 격리 통과(W-1) /
-4 OTP 통과(RFC 6238 벡터·secure_compare, W-2) / 5 SUB-001 create 통과·**CSV 우회(C-1)** / 6 SUB-002/003 통과 /
-7 체험·D-7 통과(캐시 마커 멱등) / 8 Portone SIMULATED 통과(네트워크 0) / 9 F7 지표 통과(기준 일치, W-5) /
-10 F7 뷰 통과 / 11 A2 통과(LIKE 이스케이프) / 12 A3 통과(환불 3분기·음수 방어) / 13 아키텍처·회귀 통과(**C-2 제외**,
-integ 조정 18건 전수 — 전부 교정·약화 아님) / 14 integ 요청 6건 응답 완료.
+## Tester 제안
 
-## Tester 전달 (중점)
+- B-1 재발 방지: 렌더 HTML 폼 필드 name 검증 통합 테스트(최우선)
+- REF-002: 결제 롤백 시 claim 원복 → 재시도 할인 재적용 시나리오
+- REF-006: 검증 완료 직후 만료 경과 가입 거절 통합 경로
+- REF-003: 캡 경계 초 단위 — 기존 서비스 테스트 양호
 
-- SUB-001(수정 후): CSV 상한 차단 경계(잔여 1에 2행 → 1성공/1오류행)·create 가드 회귀
-- SUB-002/003: 재시도 이벤트·past_due·suspend!/재개·D+30 카운트다운
-- ADM-001/002: 사유 없는 4조치 422·마스킹 원문 미노출·OTP 5회 잠금(합산)
-- C-2(수정 후): trial_extended 라벨 정상 렌더
-- F7: 미확인 입금 수 일치·취소 제외·PAID×미발행
+수정 범위: B-1 1줄(+테스트) — 수정 후 해당 파일·테스트 재검증으로 승인 가능.
 
-재검증 범위: C-1·C-2 수정 파일 + 전체 게이트 1회.
+## 2차 리뷰 (Phase 6 수정 후 — 2026-11-19)
 
-## 2차 리뷰 (Phase 6 수정 후 — 2026-11-18, 루프 1회차)
+상태: **APPROVED** (BLOCKER 0 / CRITICAL 0 / WARNING: W-5 후속 과제 문서화 유지)
 
-상태: **APPROVED** (BLOCKER 0 / CRITICAL 0 / WARNING 0 — 1차 WARNING 전부 해소·문서화)
+### 1차 지적 해소
 
-### 수정 검증 (파일·라인 근거)
+| ID | 해소 | 근거 |
+|---|---|---|
+| B-1 Sales 로그인 폼 scope 누락 | ✅ 실증 | sales/sessions/new.html.erb:8 `scope: :sales_session` — 템플릿 렌더 재실증 `name="sales_session[email]"`. 계약 테스트 test/controllers/sales/controllers_test.rb:22-29(렌더 필드명 단정+실제 POST 로그인)로 재발 방지 |
+| W-1 트랜잭션 내 외부 HTTP | ✅ | phone_verification_service.rb:41-49 — deliver! create! 커밋 후 이동·Solapi rescue 유지(발송 실패≠발급 실패 규약 동일) |
+| W-2 관리자 상세 뷰 쿼리 | ✅ | admin/sales_staffs_controller.rb:103 @referred_tenants 이관(422 재렌더 경로 포함) — 뷰 @변수만 |
+| W-3 대시보드 N+1 | ✅ | sales/dashboard_service.rb:28 includes(:subscription) |
+| W-4 dependent: :destroy | ✅ | sales_rep.rb:25-26 restrict_with_exception 2연관 — 앱 전역 destroy 경로 부재(grep)·sales_rep_test.rb:128-136 보존 테스트 |
+| W-5 환불 차감 | 기록 | 문서화 유지(03_implementation §5-5·§7-2) — refund 실이체 전환 시 P1 과제 |
 
-| 항목 | 검증 결과 |
-|---|---|
-| C-1 SUB-001 CSV 우회 | 해소 — students_csv_import_service.rb:13-18(잔여 슬롯 주입·nil=레거시)·37(재원 행만 소진)·67-72(초과 재원 행 오류행 — plan_limit_exceeded 사유)·114-117(active_row? 상태 매핑) / students_controller.rb:91-106(잔여 0 업로드 422 이중 방어)·158-172(remaining_active_slots 헬퍼 일원화). 경계(잔여 1×2행→1성공/1오류)·휴원 무소진(INV-004)·레거시 통과 테스트 신규·회귀 확인 |
-| C-2 i18n 누락 | 해소 — ko.yml:290 trial_extended 추가(런타임 렌더 확인) + subscription_test.rb:170-176 enum 전수×키 존재 단정(재발 방지) |
-| W-1 세션 고정 | 해소 — admin/sessions_controller.rb:50-51 reset_session 후 최종 키 재설정 |
-| W-2 OTP 폴백 | 해소 — otp_service.rb:83-84 폴백 Rails.env.local? 한정·운영 미설정 시 fail-closed. otp_seed 설정 시 조기 반환 — 정상 운영 무영향 |
-| W-3 감아 이중 기록 | 해소 — register_login_failure! 단일 경유·locked_now 반환 |
-| W-5 F7 기준 라벨 | 해소 — ko.yml:139 산식과 일치 |
-| W-7 A3 N+1 | 해소 — includes(subscription: :tenant) |
-| 경미(잔여일 음수) | 해소 — admin/tenants/show.html.erb:71-76 trial 한정 표시 |
-| W-4·W-6·W-8 | 문서화 종결 — 02_prd_update.md "후속 과제 보강" 섹션 |
+### 게이트 (Reviewer 직접 재실행)
 
-### 게이트 (재실측)
+- RuboCop 198 files 0 offenses / Brakeman 0 warnings / 테스트 590 runs, 2654 assertions, 0 failures(+2: B-1 계약·W-4 보존)
 
-- bin/rails test: 485 runs, 2154 assertions, 0 failures, 0 errors, 0 skips (+5)
-- bin/rubocop: 170 files 0 / bin/brakeman: No warnings
+### 방어 회귀 확인
 
-### 새 결함·회귀 여부
+REF-001~007 강제 로직 전 항목 무변경·해당 테스트 전건 통과. 수정 범위는 표면 8파일에 국한 —
+PaymentService·가입 플로우·마이그레이션·ko.yml 회귀 없음.
 
-없음 — create 가드·OTP·잠금·마스킹 기존 방어 무변경. 관찰(조치 불요): 잔여 0 이중 방어 오류행 line 0 표시는
-기존 인코딩 오류 규약 준수.
+### Tester 권고(잔여)
 
-### 최종 판정
-
-**APPROVED** — 수정 국소적이므로 도메인 재검증 불필요. Tester 제안: CSV 잔여 슬롯 경계·레거시 통과·
-trial_extended 렌더 유지를 회귀 스위트로 고정.
+REF-002 "결제 실패 롤백 후 할인 재적용" 경계 시나리오 정도 — B-1 방지 테스트는 이미 추가 완료.

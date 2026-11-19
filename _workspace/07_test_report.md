@@ -1,94 +1,48 @@
-# 07_test_report.md — W4 병렬 배치 테스트 게이트 (Phase 7-S)
+# 07_test_report.md — F10 추천 시스템 테스트 (Phase 7)
 
-- 실행일: 2026-11-18 · 프로필: wonbikok-tester · 판정: **PASS**
-- 범위: 1·2차 리뷰 "Tester 전달(중점)" 시나리오 고정 + 전체 게이트
-- 제약 준수: 소스(app/) 수정 0건 — 변경은 테스트 파일 7개에 한함
+- 실행일: 2026-11-19 · 프로필: wonbikok-tester · 판정: **PASS**
+- 범위: 1~2차 리뷰(05_review.md "Tester 제안"·"Tester 권고") 시나리오 보강 + REF-001~007 커버 점검 + 전체 회귀
 
-## 1. 게이트 결과 (실측)
+## 1. 실행 결과 (게이트)
 
 | 게이트 | 결과 |
 |---|---|
-| `bin/rails test` | **490 runs, 2,216 assertions, 0 failures, 0 errors, 0 skips** (2차 리뷰 485 기준 +5 runs / +62 assertions) |
-| `bin/rubocop` | 170 files inspected, **no offenses** |
+| `bin/rails test` | **592 runs, 2,672 assertions, 0 failures, 0 errors, 0 skips** (Phase 6 기준 590 → +2 보강) |
+| `bin/rubocop` | 198 files inspected, **no offenses** |
 | `bin/brakeman` | **No warnings found** |
+| 외부 실호출 | 없음 — test env 솔라피 키 공란 → `PhoneVerificationService#simulated?` SIMULATED 분기 확인(config/solapi.yml), F10 테스트에 포트원·바로빌 호출 경로 없음 |
 
-- 실패 원인 분류: 게이트 진행 중 1건(서비스 CSV 3행 테스트)이 픽스처 원생명 "박도윤"과의
-  이름 충돌로 실패 → **테스트 오류**(코드 버그 아님 — CSV 행 자체는 정상 오류행 처리됨).
-  테스트 데이터명을 "초과원생"으로 변경 후 재실행 통과. 소스 수정 없음.
+## 2. 보강 내역 (리뷰 권고 2건 — 모두 미커버 확인 후 추가, 테스트만·소스 무수정)
 
-## 2. 외부 실호출 격리 확인 (전부 유지)
+| # | 시나리오 | 파일 | 기존 커버 상태 → 조치 |
+|---|---|---|---|
+| 1 | **REF-002 결제 트랜잭션 롤백 시 할인 claim 원복 → 재시도 결제에 할인 재적용** — claim(`first_payment_discounted_at` 원자 갱신) 성공 직후 기간 갱신 단계를 1회 한정 실패 유도(인스턴스 싱글턴 `update!` 재정의 — 기존 WARNING-6 테스트 패턴 준용) → 롤백 검증: 결제 실패·claim nil 원복·이벤트/ledger 0건·trial 유지 → 재시도: 8,000원(20% 할인) 재적용·ledger 1건 | `test/services/subscriptions/payment_service_test.rb` | 부재(기존은 "할인 서비스 자체 실패→정상가 폴백"만 커버) → **추가** |
+| 2 | **REF-006 검증 완료 직후 TTL 만료 경과 시 가입 거절** — `usable_for_signup?`(verified·미소비·미만료)이 가입 create 통합 경로에서 422 거절로 이어지는지 검증 + 미소비 유지(재인증 후 가입 가능) | `test/controllers/registrations_controller_test.rb` | 부재(모델 `usable_for_signup?`·서비스 `consume!` 만료는 커버, 컨트롤러 create 경로만 공백) → **추가** |
 
-| 연동 | 격리 장치 | 확인 |
+- 2차 리뷰 잔여 권고는 본 2건이 전부(REF-003 캡 경계는 기존 commission_service_test로 충분 판정 — 1차 합의) → 신규 생략 없음.
+- 시행 착오 1건(테스트 오류, 코드 버그 아님): `raise ActiveRecord::RecordInvalid, "문자열"`은 record 기반 생성자라 NoMethodError — record 기반 `errors.add` + `RecordInvalid.new(self)`로 수정 후 통과.
+
+## 3. REF-001~007 커버 매핑 (구현 보고서 §6 대조 + 전건 실행 확인)
+
+| Rule | 강제 수단 | 커버 테스트 (전건 통과) |
 |---|---|---|
-| 포트원 | `Portone::BillingService` SIMULATED 이중 게이트(api_key 미등록 OR `PORTONE_LIVE!=1`) + 테스트 네트워크 스파이(`Net::HTTP.new` 접촉 시 예외) — portone_billing_service_test 5건 전부 통과 | ✅ |
-| 솔라피 | `FakeSolapiClient` 스텁 주입(from_credentials 교체·teardown 복원) — message_send_job_test | ✅ |
-| 바로빌 | 스텁 XML 파싱만(직접 HTTP 규격 스텁) — barobill_services_test | ✅ |
-| 트리거 | CashReceipt::Triggerable — Job enqueue 단정까지만(발행 실호출 없음) | ✅ |
+| REF-001 코드 발급·유효·스냅샷 | CodeService(8자·7일·교체)·`ReferralCode.live`·가입 422 | code_service 4(발급/verify/재발급/rotate_all)·referral_code 4(유니크/active?/live/형식)·registrations 3(유효 매핑+스냅샷·만료 422·무효 422·대소문자 정규화)·E2E 로테이션 무영향 |
+| REF-002 첫 결제 20% 1회·멱등 | DiscountService 원자 claim | discount_service 6(적용/재결제/비추천/환불 재결제/5동시 경쟁 1회/원단위 반올림)·payment F10 6(첫 할인+ledger/2차 정상가/비추천 회귀/수수료 실패 무시/할인 실패 폴백/**롤백 claim 원복→재시도 재적용 신규**)·E2E 24,000 징수 |
+| REF-003 수수료 발생·캡·징수액 기준 | CommissionService within_cap?·스냅샷 | commission_service 8(pending 생성/officer 15%/비추천·0원 제외/sales 13개월 제외·경계 포함/officer 무기한/캡 조정/집계 3종/mark_paid 사유+멱등)·payment(할인 후 징수액 기준)·dashboard 월별 집계 |
+| REF-004 ledger 스냅샷 불변 | 스냅샷 컬럼·수정 경로 부재 | commission_service 1(요율 변경 후 기존 불변·신규 신요율)·commission_ledger 3(스냅샷 불변/month 형식/paid→paid_at) |
+| REF-005 직원 스코프·접근 | Sales::BaseController·DashboardService 단일 경로 | dashboard_service 4(피판매 본인만·개인정보 미수집/월별 타직원 제외/위임 스코프/active_code)·sales controllers(대시보드 본인만/비로그인 리다이렉트/세션 키 분리/연도 클램프)·sales_rep referred_tenants 원천 |
+| REF-006 가입 휴대폰 인증 | PhoneVerificationService(bcrypt·5회·1분·원자 소비)+create 서버 검증 | phone_verification 11(bcrypt 평문 없음/정규화/1분 리밋/타번호/재발송 무효화/verified_at/만료 거절/5회 차단/not_found/consume 원자 1회/미검증·만료 미소비)·signup_verification 4(형식/암호화 TEN-003/attempts/usable 3조건)·registrations 8(미검증 422/전화 불일치/소비 재사용 불가/**만료 직후 거절 신규**/발송·검증 액션/오류 코드 422/형식 422/429)·E2E 실제 발송→검증 플로우 |
+| REF-007 정지·코드 무효·접근 차단 | suspend!(사유 필수+코드 무효화)·세션 재확인 | sales_rep 5(suspend 사유 필수/상태 변경 2차 방어/resume/로그인 잠금/삭제 restrict)·sales controllers 2(정지 로그인 차단/정지 세션 차단)·code_service 2(정지 코드 verify 실패/rotate 제외)·rotation_job 1(정지 제외)·admin 4(사유 없는 정지 422/사유 정지+감사 로그/해제 사유/지급 확정 사유+멱등)·E2E 정지 코드 가입 거절 |
 
-## 3. 리뷰 제안 시나리오 — 보강/생략 내역
+전 Rule 정상/경계/예외 3분기 충족 — 누락 시나리오 없음(빠진 것 없어 신규 추가는 리뷰 권고 2건뿐).
 
-### 3.1 SUB-001 CSV 경계 회귀 고정 — 보강 3건 (신규)
+## 4. 남은 갭 (기록·차단 아님 — 후속 과제로 이미 문서화)
 
-Phase 6 기존 6건(컨트롤러 4: 상한 422·잔여1×2행·휴원 집계 제외·레거시 create / 서비스 2:
-잔여1×2행·휴원·퇴원 무소진)과 중복되지 않는 경계만 추가:
+1. **W-5 환불 시 ledger 역분 미구현** — v1.0 refund 기록-only 정합과 일치, 03_implementation §7-2 P1 과제 유지. refund 실이체 전환 시 REF-003 역분 테스트 필요.
+2. 인증번호 발송 동기 처리(SIMULATED)는 카카오 템플릿 심사 후 Job 래핑 재검토 대상(§7-1) — 현 테스트는 SIMULATED 경로 고정.
+3. 피판매 100건 상한 초과 페이징(§7-5) — 집계 테스트는 상한 내 기준.
 
-| 테스트 | 파일 | 내용 |
-|---|---|---|
-| 잔여 1 슬롯에 재원 3행은 1성공/2오류행(SUB-001) | students_csv_import_service_test.rb | 초과 행 **2행 이상**이 각각 행번호(3·4)와 "잔여 슬롯" 사유로 수집됨 — 기존은 2행/1오류뿐 |
-| 재원·휴원 혼합 파일에서 휴원 행 무소진(SUB-001) | students_csv_import_service_test.rb | 재원2+휴원1·잔여1 → 재원1성공+재원1오류(3행)+휴원1성공 — 혼합 파일에서 INV-004 무소진 |
-| 레거시 계정 CSV 등록 상한 없이 처리(SUB-001) | students_controller_test.rb | 구독 부재(nil=레거시) 단정 + CSV import 200 — 기존 레거시 핀은 create 경로만, C-1 대상 경로인 CSV는 미핀 |
+## 5. 결론
 
-### 3.2 ADM-001/002 — 보강 4파일 (기존 테스트 강화)
-
-| 항목 | 판단 | 내용 |
-|---|---|---|
-| 사유 없는 4조치 422 | 기존 커버 | 플랜 변경·연장·정지·해제(tenant_actions 4건) + 환불(subscription_payments) — 전부 존재 |
-| **audit 미기록 단정** | **보강** | 기존 422 단정에 audit 부재 단정이 없었음 → `assert_rejected_without_reason` 헬퍼가 `AuditLog.count` 무증가 + 조치별 action·target 부재를 단정하도록 강화(플랜 변경·연장·정지·해제 4건에 일괄 적용). 환불 테스트도 `refund_confirmed` audit 미기록 + `AuditLog.count` 무증가 추가 |
-| **마스킹 원문 미노출** | **보강** | index는 기존 단정 존재(사업자번호·휴대폰 원문 `assert_no_match`) → 상세(show) 화면에 원문 2종 미노출 단정 추가(열람 audit이 발생하는 화면) |
-| OTP 5회 잠금(비밀+OTP 합산) | 기존 커버 — 생략 | sessions_controller_test "5회 실패(1·2단계 합산)" = 비밀번호 3회 + OTP 2회 → locked? + `account_locked` audit + 잠금 후 올바른 자격 차단까지 단정. 모델 경계(admin_user_test 4회 미잠금/5회 잠금)도 존재 |
-
-### 3.3 trial_extended 렌더 — 신규 1건
-
-| 테스트 | 파일 | 내용 |
-|---|---|---|
-| trial_extended 이벤트 라벨이 구독 이력에 정상 렌더(C-2) | subscriptions_controller_test.rb | `trial_extended` 이벤트 생성 → 원장 구독 화면에서 `subscriptions.events.trial_extended`("체험 연장") 라벨 렌더 + `translation_missing` 부재 단정. 기존의 enum 전수×키 존재 단정(subscription_test C-2)의 **실렌더 보강** — 3-S ko.yml 병합 완료 후 단정 가능해짐 |
-
-### 3.4 F7 정합 — 신규 1건 + 기존 커버 확인
-
-| 항목 | 판단 | 내용 |
-|---|---|---|
-| **미확인 입금 수 = payments#index 기준 일치** | **신규** | dashboard_controller_test: 혼합 데이터(미완납 3 + 초안·취소·완납·타월 제외 4) → 대시보드 할 일 "3명" 렌더 단정 + payments 화면 미완납 행 수 3(수납 등록 링크 셈)과 **일치 단정** + 초안·취소(INV-003)·타월 원생명 미노출. 기존 서비스 테스트는 기준 병렬 재구현이라 실렌더 핀이 없었음 |
-| 취소 청구(INV-003) 정산 제외 | 기존 커버 — 생략 | summary_service_test 2건(지표 정산 취소 200,000 제외·취소 전환 수납 정산 미포함) |
-| PAID×미발행 잔여 | 기존 커버 — 생략 | summary_service_test(issued 없는 PAID만·failed 보유도 대상) + dashboard_controller_test(무발행 원생 노출) |
-
-### 3.5 SUB-002/003 — 생략 (전부 기존 커버, 사유: f8 테스트와 중복)
-
-| 시나리오 | 기존 테스트 (중복이므로 미추가) |
-|---|---|
-| 3회 실패 → past_due 전이 | retry_policy_service_test "2회까지 active, 3회 past_due + 보관 만료일 기록"(SUB-002) |
-| suspend! | retry_policy_service_test "past_due에서만 허용 + suspended 이벤트 + 재정지 거절"(SUB-002) |
-| 재개 | payment_service_test "suspended 상태에서 수동 결제하면 재활성화(SUB-002 정지 해제)" |
-| D+30 카운트다운 | retry_policy_service_test "past_due 시점 + 30일 — remaining 30/1/0/-1"(SUB-003) + subscriptions_controller_test past_due 배너 렌더 |
-
-## 4. Rule ID 커버 매핑 (본 배치 보강분)
-
-| Rule ID | 보강 테스트 | 정상/경계/예외 |
-|---|---|---|
-| SUB-001 | CSV 잔여 1×3행(경계)·혼합 행 무소진(정상)·레거시 CSV 통과(정상) | 3건 |
-| ADM-001 | 사유 없는 5조치 × audit 미기록 단정(예외 — 기존 422 테스트 강화) | 5건 강화 |
-| ADM-002/TEN-003 | admin 상세 마스킹 원문 미노출(정상 — 기존 테스트 강화) | 1건 강화 |
-| C-2(i18n) | trial_extended 원장 화면 라벨 렌더(정상) | 1건 |
-| F7/INV-003 | 대시보드↔payments 미확인 입금 기준 일치(정합) | 1건 |
-
-## 5. 남은 갭 (테스트 범위 밖 — 기록)
-
-1. SUB-002 자동 정지 주체(배치)·데이터 삭제 배치(SUB-003 이행)·포트원 실호출(P1) — 02_prd_update 후속 과제로 문서화됨. 구현 전 테스트 대상 아님.
-2. 관리자 정지 실차단(v1.0 이력 기록만) — 후속 구현 시 TEN 측 차단 테스트 필요.
-3. 관리자 OTP 테스트는 개발 폴백 시크릿 경유(Rails.env.local? 한정 — otp_service.rb:83-84). 운영 otp_seed 운용 시 RFC 벡터 테스트로 대체 커버됨(otp_service_test).
-4. 체험 D-7 알림 잡은 SIMULATED 로그+캐시 마커 — 실발송 전환 시 발송 유일성 저장소 확장과 함께 테스트 보강 필요(integ §5.1).
-
-## 6. 결론
-
-**PASS** — 1·2차 리뷰의 Tester 전달 항목을 5건 신규 + 3파일 기존 테스트 강화로 고정.
-전체 게이트(490 runs·RuboCop 0·Brakeman 0) 통과, 외부 실호출 장치 유지, 소스 수정 0.
-코드 버그 0건(진행 중 1건 실패는 테스트 데이터명 충돌 — 테스트 오류로 분류·수정).
+- 리뷰 권고 2건 보강 완료(REF-002 롤백-재적용 경계·REF-006 만료 통합 경계) — 두 시나리오 모두 **현 구현 동작이 기대대로** 롤백 원복·거절을 확인(코드 버그 없음).
+- REF-001~007 전 시나리오 커버·전 건 통과. 품질 게이트(rubocop 0·brakeman 0·592 tests 0 failures) 충족 — F10 Phase 7 테스트 **PASS**.
