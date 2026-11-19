@@ -1,7 +1,7 @@
 {
-  "domain": "w4-f7-f8-admin-parallel",
+  "domain": "referral-sales-staff",
   "currentPhase": null,
-  "pipelineType": "parallel",
+  "pipelineType": "full",
   "mode": "normal",
   "parallelTasks": [
     {
@@ -58,64 +58,64 @@
     {
       "phase": "0",
       "status": "completed",
-      "note": "컨텍스트 확인 — progress null·git clean·롤오버(_workspace_prev4), F7/F8/12장 A0~A3·SUB/ADM·11장 조사"
+      "note": "컨텍스트 확인 — progress null·git clean·롤오버(_workspace_prev5), 가입/결제/관리자 구조 파악"
     },
     {
-      "phase": "1-P",
+      "phase": "1",
       "status": "completed",
-      "note": "분해·판정 — f7∥f8∥admin 3그룹(상한 3), Subscription 시그니처 사전 고정으로 의존 해소, F8 실결제 SIMULATED·F7 PDF 후속, 01_plan.md"
+      "note": "기획 검토+플랜 — 수수료 15%/12개월 recurring 표준 제안·첫결제 10% 1회·주간 코드 로테이션·휴대폰 인증(SIMULATED)·Sales:: 분리 대시보드, Full 직렬"
+    },
+    {
+      "phase": "approval",
+      "status": "completed",
+      "note": "2차 수정(sales/officer 이중 역할)·3차 수정(첫결제 20% 할인) 후 최종 승인"
     },
     {
       "phase": "2",
       "status": "completed",
-      "note": "PRD v2.7 — 14장 W4 확정 블록(Subscription·subscription_events·F8 SIMULATED·AdminUser OTP·축소), 02_prd_update.md"
+      "note": "PRD v2.8 — 7장 F10 절·22장 REF-001~007·14장 F10 확정 블록, 02_prd_update.md"
     },
     {
-      "phase": "3-P",
+      "phase": "3",
       "status": "completed",
-      "note": "f7(대시보드·산식 확정) ∥ f8(Subscription·SIMULATED 15건 스cratch 검증) ∥ admin(A0~A3·TOTP RFC6238) — 화이트리스트 준수 보고"
-    },
-    {
-      "phase": "3-S",
-      "status": "completed",
-      "note": "통합 — 마이그레이션 1회(4테이블)·routes·ko.yml 300+키·recurring 3잡·enum/has_many 결선·조정 18건, 480 runs 0 실패"
+      "note": "developer — F10 전 범위(마이그레이션 1회·모델/서비스 6종·가입 인증·할인·수수료 원장·Admin/Sales) — 588 runs 0 실패(+98)"
     },
     {
       "phase": "4",
       "status": "completed",
-      "note": "오케스트레이터 재검증 — rubocop 170파일 0 / brakeman 0 / 480 runs 0 실패"
+      "note": "오케스트레이터 재검증 — rubocop 198파일 0 / brakeman 0 / 588 runs 0 실패"
     },
     {
       "phase": "5",
       "status": "completed",
-      "note": "reviewer CHANGES_REQUESTED — C-1(CSV 상한 우회)·C-2(trial_extended i18n 누락)·W8, 14항목 중 12 통과"
+      "note": "reviewer CHANGES_REQUESTED — B-1(Sales 로그인 폼 파라미터 불일치·/sales 접근 불능)+W5, REF 12항목 중 11 PASS"
     },
     {
       "phase": "6",
       "status": "completed",
-      "note": "C-1(remaining_active_slots 이중 방어)·C-2(i18n+전수 테스트)+W1/2/3/5/7·경미 — 485 runs 0 실패"
+      "note": "B-1(폼 scope 1줄+계약 테스트)+W1(deliver 트랜잭션 밖)+W2(뷰 쿼리 이관)+W3(includes)+W4(restrict) — 590 runs 0 실패"
     },
     {
       "phase": "5",
       "status": "completed",
-      "note": "2차 재검증 APPROVED(루프 1회차) — C-1·C-2·W 전건 해소 라인 근거 확인"
+      "note": "2차 재검증 APPROVED(루프 1회차) — B-1 실증 해소·W4건 확인·REF 방어 무변경"
     },
     {
-      "phase": "7-S",
+      "phase": "7",
       "status": "completed",
-      "note": "tester — 보강 5건+강화 3파일(audit 미기록 단정·마스킹 상세·trial_extended 렌더·미확인 입금 일치), 490 runs 0 실패"
+      "note": "tester — REF-002 롤백 재적용·REF-006 만료 통합 보강, REF-001~007 매핑 누락 0, 592 runs 0 실패"
     },
     {
       "phase": "8",
       "status": "completed",
-      "note": "부트 정상·/admin/session/new 200·subscription·admin·report 게이트 302·오류 0건(1차 오류 1건은 검증자 경로 오휴)"
+      "note": "부트 정상·/registration/new·/sales/session/new 200(B-1 실동작 확인)·/sales·/admin/sales_staffs 302·오류 0건(1차 1건은 검증자 경로 오휴)"
     },
     {
       "phase": "9",
       "status": "completed",
-      "note": "AGENTS.md W4 행 갱신·memory(w4-progress)·완료 보고 — 커밋은 git-deploy 절차로 대기"
+      "note": "AGENTS.md 진행 표+도메인 표 REF 행·memory(f10-referral-system)·완료 보고 — 커밋 대기"
     }
   ],
   "awaitingApprovalPlan": "_workspace/01_plan.md",
-  "lastUpdated": "2026-11-18T20:40:00+09:00"
+  "lastUpdated": "2026-11-19T15:20:00+09:00"
 }

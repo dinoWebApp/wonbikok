@@ -2,7 +2,7 @@
 
 | 문서 정보 | 내용 |
 |---|---|
-| 문서 버전 | v2.7 (W4 F7·F8·관리자 A1~A3 구현 확정 반영) |
+| 문서 버전 | v2.8 (F10 영업 직원·오피서 추천 시스템 반영) |
 | 작성일 | 2026-10-20 (14장 최종 수정 2026-11-18 · 2차) |
 | 상태 | 확정 — 개발 착수 |
 | 용도 | 1인 개발·운영용 실행 스펙 (외부 공유 전 별도 정리 필요) |
@@ -420,6 +420,45 @@
 - [ ] 결제 관련 모든 통지는 알림톡/문자 + 앱 내 배너 이중 전달
 - [ ] 결제·환불·발행 취소는 금액·상태 기준 상호 정합 유지(부분 환불 후 발행 취소액 계산 등)
 
+### F10. 영업 직원·오피서 추천 시스템 (2026-11-19 확정)
+
+**유저스토리**: 운영자는 영업 직원(officer 포함)이 추천 코드로 모신 원장을 추적하고, 역할별 수수료를
+투명하게 지급하고 싶다. 영업 직원은 내가 모신 사용자의 결제 실적과 내 수수료를 스스로 확인하고 싶다.
+
+**역할 체계 (단일 sales_reps 테이블·role 구분 — 계정·코드·대시보드 동일 체계)**
+
+| | sales 역할 (영업 직원) | officer 역할 (지인·감투용) |
+|---|---|---|
+| 수수료 | 20% | 15% |
+| 지급 기간 | 12개월 캡(피판매 테넌트 가입일부터 12개월 내 결제분만 집계) | 무기한(구독 유지 중 계속) |
+| 타이틀 | 표시용 자유 텍스트("영업 이사" 등) | 표시용 자유 텍스트("CRO" 등) |
+
+**기능 명세**
+
+- 관리자(A2 확장): 영업 직원 CRUD(role·타이틀·수수료율[0.05~0.30]·캡 개월 설정)·정지(사유 필수 ADM-001)·
+  직원별 수수료 요약·지급 확정(paid) 처리.
+- 추천 코드: 직원별 예측 불가 8자·유효 7일 — **주간 로테이션**(기코드 만료·신규 발급). 가입 매핑은
+  가입 시점 코드→직원 스냅샷.
+- 추천 가입: 가입 폼에 추천 코드 입력(선택) — 유효 코드만 수용(만료 거절).
+- **첫 결제 20% 할인**: 피추천 테넌트 첫 유료 결제 1회 — 이후 정상가. 원가·할인액 기록(멱등 1회).
+- **휴대폰 인증 가입(전 가입 대상)**: 휴대폰번호 필수 → 6자리 인증번호 알림톡 발송(솔라피 — v1.0
+  SIMULATED·SMS 대체 체계, 실제 카카오 인증 템플릿 심사는 운영 과제) → 5분 내 검증 일치 시에만 가입
+  진행(시도 5회 제한). 휴대폰 유일(중복 가입 차단)은 기존 규칙(TEN) 준수.
+- 영업 직원 대시보드(`Sales::` 별도 네임스페이스·이메일+비밀번호·관리자 권한 없음·직함 노출):
+  피판매 사용자 목록(가입일·플랜·상태)·월별 결제액 집계·**이번달 수령 예상(전월 확정 결제 기준)**·
+  **연도별 누적 수수료**·현재 유효 추천 코드(복사). 직원 스코프 격리(본인 데이터만).
+- 수수료: **월 단위 후불** — 실제 징수된 결제 금액(할인 후·취소 제외) 기준. commission_ledgers로
+  결제 시점 원장 축적(원가·비율·금액 스냅샷).
+
+**수용조건**
+
+- [ ] 첫 결제 할인은 테넌트당 정확히 1회(재결제·환불 재결제에 미적용)
+- [ ] 12개월 캡는 피판매 테넌트 가입일 기준으로 결제 시점 판정(캡 경과 결제는 ledger 미생성)
+- [ ] 수수료 집계 = 실제 징수액 기준(환불 차감·취소 제외 — SUB-005 정합)
+- [ ] 직원은 타 직원·타 직원 피판매자 데이터 접근 불가
+- [ ] 인증 완료 없이는 가입 create 불가(서버 검증)·인증번호 시도 5회 제한
+- [ ] 코드 로테이션으로 기존 가입자 매핑 영향 없음
+
 ---
 
 ## 8. 학부모용 청구 페이지 (F9)
@@ -835,7 +874,8 @@
 **W2 구현 확정 사항(2026-10-20)**: Invoice는 확정 시점 스냅샷(원생명·기본 원비)과 조정액·비고·due_on을 보유하며 [student_id, target_month] 유니크 제약으로 INV-001을 강제한다. MessageLog는 channel(알림톡/SMS)·template_type·status(9.3)·provider_message_id·error_code·resend_of를 기록하고 [invoice_id, template_type] 발송 유일성을 갖는다(명시적 재발송은 resend_of로 연결·예외). 솔라피 Messages v4 연동 — 발송 요청 응답 기반 상태 기록(수신 리포트 폴링·웹훅은 P1), 알림톡 실패 시 대체발송(SMS/LMS)을 단일 요청으로 위임.
 **W3 F5 구현 확정 사항(2026-11-16)**: 발급대행은 바로빌(SOAP — CERTKEY+회원사 CorpNum/UserID). cash_receipts 테이블은 mgt_key 유니크 제약으로 CR-001을 강제하고 identity_num은 암호화 저장, barobill_state(정수)·nts_confirm_num·retry_count를 둔다. tenants에 biz_tel·biz_type·email·barobill_member_id(불변) 추가 — RegistCorp 필수 항목. guardians.business_number(암호화, 지급증명용), students.cash_receipt_issue_type(원생별 선택). 어댑터는 환경별 키·엔드포인트 쌍 분기(운영 ws/테스트 testws), cert_key 공백 시 SIMULATED. TradeDate D-1 제약으로 전월 소급 발행 불가 — 월 넘김 입금건은 재안내 처리. F4 입금확인 트리거는 `CashReceipt::Triggerable` 인터페이스로 정의하며 F5 단독 실행 시 수동 발행 경로로 검증한다.
 **W3 F4/F9 구현 확정 사항(2026-11-18)**: Payment 테이블(invoice_id·tenant_id·amount·paid_on·method·memo·status[active/cancelled]·cancel_reason·cancelled_at·confirmed_by·confirmed_at) — 마이그레이션 통합 1회 생성. 입금 확인(체크)은 `Payments::ConfirmService`가 전액/부분을 처리하고 invoice 상태를 PAID/PARTIALLY_PAID로 전이하며, **자동발행은 완납(PAID) 시점에만 `Triggerable origin: :auto` 1회 호출**(부분납 상태에서는 자동발행 보류 — 원장 수동 발행은 허용, PAY-004·CR-002 정책 확정). 오체크 취소는 Payment 취소 이력 + invoice 상태 재계산(삭제 아님, PAY-002). 매칭 힌트는 금액·원생명 기반 추천 전용(PAY-003). 청구 링크는 invoices.public_token(예측 불가 토큰·유니크) + 발급/취소 시각 컬럼 — `/b/{token}` 공개 라우트(비로그인). 공개 페이지 표시는 교습소명·문의처(원터치 발신)·금액(스냅샷)·내역·납부 기한·납부 상태·계좌 복사 원탭·현금영수증 자동발급 안내로 한정(LNK-002 노출 최소), 납부 상태는 invoice.status 기반(납부 전/확인 중/납부 완료). 접근 로그(LNK-004)는 A4/A9 착수 시 연계.
-**W4 구현 확정 사항(2026-11-18)**: Subscription 테이블(tenant_id 유니크·plan[light/standard]·status[trial/active/past_due/suspended/cancelled]·trial_started_at/trial_ends_at·current_period_*)과 `subscription_events`(이벤트 소스 — trial_started/manual_payment/payment_failed/retry/past_due/suspended/plan_changed/refund·A2 타임라인과 A3 결제 이력을 동일 테이블로 서빙). **F8 v1.0 최소형**: 실제 카드 결제·빌링키 발급은 포트원 어댑터 SIMULATED(11장 "P1 이전 수동 결제·파일럿 무료 운영" 조항 채택) — 수동 결제 기록+결제 실패 3회 재시도 상태 전이(SUB-002)·체험 30일 자동 시작·SUB-001 원생 상한 차단(students 생성 가드)·체험 D-7 알림(Recurring·SIMULATED). 관리자: AdminUser(이메일+비밀번호+OTP[사전 공유 시크릿 기반 6자리·로그인 5회 실패 잠금])·AuditLog(ADM-001 영구 보존)·`Admin::` 네임스페이스 별도 인증(운영 배포 시 서브도메인 격리 가능). A1 추이 그래프는 숫자 표로·A2 데이터 내보내기·A3 실제 환불 이체는 후속. **F7 마감 리포트 PDF는 후속 과제**(HTML 화면으로 구현 — PDF 젬 선정·플랜 게이팅 별도 태스크). A5(현금영수증 발행 관리)는 본 배치 제외 후속. W2 미납 임시 판정 규칙: SENT 상태 & due_on 경과 & 완납 기록 없음(Payment 도입 W3에서 확장). 리마인더 설정은 tenants 컬럼(톤·단계별 ON/OFF·발송 시각), 원생별 제외는 students.excluded_from_reminders. 연습 모드·연동 키 미설정 시 발송은 SIMULATED로 기록한다.
+**W4 구현 확정 사항(2026-11-18)**: Subscription 테이블(tenant_id 유니크·plan[light/standard]·status[trial/active/past_due/suspended/cancelled]·trial_started_at/trial_ends_at·current_period_*)과 `subscription_events`(이벤트 소스 — trial_started/manual_payment/payment_failed/retry/past_due/suspended/plan_changed/refund·A2 타임라인과 A3 결제 이력을 동일 테이블로 서빙). **F8 v1.0 최소형**: 실제 카드 결제·빌링키 발급은 포트원 어댑터 SIMULATED(11장 "P1 이전 수동 결제·파일럿 무료 운영" 조항 채택) — 수동 결제 기록+결제 실패 3회 재시도 상태 전이(SUB-002)·체험 30일 자동 시작·SUB-001 원생 상한 차단(students 생성 가드)·체험 D-7 알림(Recurring·SIMULATED). 관리자: AdminUser(이메일+비밀번호+OTP[사전 공유 시크릿 기반 6자리·로그인 5회 실패 잠금])·AuditLog(ADM-001 영구 보존)·`Admin::` 네임스페이스 별도 인증(운영 배포 시 서브도메인 격리 가능). A1 추이 그래프는 숫자 표로·A2 데이터 내보내기·A3 실제 환불 이체는 후속. **F7 마감 리포트 PDF는 후속 과제**(HTML 화면으로 구현 — PDF 젬 선정·플랜 게이팅 별도 태스크). A5(현금영수증 발행 관리)는 본 배치 제외 후속.
+**F10 구현 확정 사항(2026-11-19)**: sales_reps(name·email 유니크·password_digest·role[sales/officer]·title 자유 텍스트·status·commission_rate[role 기본 0.20/0.15]·commission_cap_months[sales 12/officer nil]·suspended_reason)·referral_codes(직원·코드 유니크·expires_at·replaced_at 로테이션 이력)·signup_verifications(전화·코드 해시·만료·시도·검증/소비 시각)·commission_ledgers(직원·테넌트·월·base_amount·rate·amount·status[pending/paid]·source 이벤트). tenants에 referred_by_sales_rep_id·referral_code_snapshot·first_payment_discounted_at. 수수료는 결제 시점 원장 축적 + 월 후불 요약(전월 확정 기준 수령 예상 표시). 가입 플로우: 휴대폰 인증 → 추천 코드(선택) → 가입. W2 미납 임시 판정 규칙: SENT 상태 & due_on 경과 & 완납 기록 없음(Payment 도입 W3에서 확장). 리마인더 설정은 tenants 컬럼(톤·단계별 ON/OFF·발송 시각), 원생별 제외는 students.excluded_from_reminders. 연습 모드·연동 키 미설정 시 발송은 SIMULATED로 기록한다.
 
 | 개체 | 목적 | 주요 항목 예시 |
 |---|---|---|
@@ -1259,3 +1299,10 @@
 | ADM-003 | 현금영수증 재발행 조치는 '원장 확인 후'가 원칙이며, 서버 문제 예외만 사유와 함께 직접 재발행한다 | A5 |
 | ADM-004 | 운영 설정 변경은 2단계 확인(미리보기→확정)과 이력 보존을 거치며, 가격 변경은 30일 사전 고지 후 적용한다 | A9 |
 | ADM-005 | 관리자 발행 대장 수치 = 원장 앱 리포트 수치 = 실제 공급자 처리 건수의 정합을 월 1회 자동 대조로 검증한다 | A5, 15.2 |
+| REF-001 | 추천 코드는 예측 불가 값·7일 유효·주간 로테이션되며, 만료 코드로는 가입할 수 없다 | F10 |
+| REF-002 | 첫 결제 할인(20%)은 피추천 테넌트당 정확히 1회만 적용된다(멱등) | F10, 11장 |
+| REF-003 | 수수료는 역할 정책(sales 20%·12개월 캡 / officer 15%·무기한)에 따라 실제 징수액 기준으로만 발생한다 | F10 |
+| REF-004 | 수수료 원장(commission_ledgers)은 결제 시점 금액·비율 스냅샷을 보존하며 이후 요율 변경에 소급 영향받지 않는다 | F10 |
+| REF-005 | 영업 직원 계정은 본인 피판매 테넌트·본인 수수료만 접근 가능하다(스코프 격리) | F10, TEN-001 준용 |
+| REF-006 | 가입은 휴대폰 인증(알림톡 인증번호) 완료 시에만 가능하며, 인증 시도는 5회로 제한한다 | F10, TEN 준용 |
+| REF-007 | 직원 정지는 사유 필수(ADM-001)와 함께 즉시 코드 무효화·대시보드 접근 차단으로 이어진다 | F10 |
