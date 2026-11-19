@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <title><%= content_for(:title) || t("sales.layout.title") %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= yield :head %>
+
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <%# 영업 직원 대시보드 — 웜 오렌지 계열·데스크톱/모바일 겸용(F10).
+      직함(title)은 헤더에 노출(ROLE 표시용 자유 텍스트). 관리자 권한 없는 제한 계정. %>
+  <body class="min-h-dvh bg-canvas font-sans text-base leading-relaxed text-ink antialiased">
+    <header class="border-b border-line bg-surface">
+      <div class="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4">
+        <div class="flex min-w-0 items-center gap-2.5">
+          <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-sm font-extrabold text-white">W</span>
+          <div class="min-w-0">
+            <p class="truncate text-sm font-extrabold leading-tight"><%= t("sales.layout.title") %></p>
+            <% if current_sales_rep&.title.present? %>
+              <p class="truncate text-xs text-muted"><%= current_sales_rep.title %></p>
+            <% end %>
+          </div>
+        </div>
+        <% if current_sales_rep %>
+          <div class="flex shrink-0 items-center gap-3">
+            <span class="hidden text-sm text-muted sm:inline"><%= current_sales_rep.name %></span>
+            <%= button_to t("sales.sessions.sign_out"), sales_session_path, method: :delete,
+                  form: { class: "inline" },
+                  class: "rounded-lg px-2 py-1.5 text-sm font-semibold text-muted hover:bg-canvas hover:text-ink" %>
+          </div>
+        <% end %>
+      </div>
+    </header>
+
+    <main class="mx-auto w-full max-w-5xl px-4 py-6">
+      <%= render "shared/flash" %>
+      <%= yield %>
+    </main>
+  </body>
+</html>

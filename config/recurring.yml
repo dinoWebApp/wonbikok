@@ -26,6 +26,14 @@ production:
     queue: default
     schedule: "30 9 * * *"
 
+  # ------------------------------------------------------------------
+  # 추천 시스템 배치 (F10 — REF-001: 추천 코드 주간 로테이션, 월요일 09:00 — 발송 없는 배치)
+  # ------------------------------------------------------------------
+  referral_code_rotation:
+    class: ReferralCodeRotationJob
+    queue: default
+    schedule: "0 9 * * 1"
+
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12

@@ -27,3 +27,26 @@ if admin.previously_new_record?
   Rails.logger.info("[Seeds] AdminUser created email=#{admin.email} " \
                     "otp_source=#{admin.otp_secret.present? ? "otp_secret" : "otp_seed/폴백"}")
 end
+
+# ---------------------------------------------------------------------------
+# 영업 직원·오피서 시드 (F10 — role별 샘플 1계정씩, ENV 기반)
+#
+#   SALES_EMAIL / SALES_PASSWORD   — sales 역할(20%·12개월 캡)
+#   OFFICER_EMAIL / OFFICER_PASSWORD — officer 역할(15%·무기한)
+#   미지정 시 개발 기본값. 생성 시 첫 추천 코드 발급(7일 — ReferralCodeRotationJob이 주간 갱신).
+# ---------------------------------------------------------------------------
+[
+  { env_prefix: "SALES", role: "sales", name: "영업 직원 샘플", title: "영업 이사",
+    default_email: "sales@wonbikok.local" },
+  { env_prefix: "OFFICER", role: "officer", name: "오피서 샘플", title: "CRO",
+    default_email: "officer@wonbikok.local" }
+].each do |config|
+  rep = SalesRep.find_or_create_by!(email: ENV.fetch("#{config[:env_prefix]}_EMAIL",
+                                                        config[:default_email])) do |record|
+    record.name = config[:name]
+    record.role = config[:role]
+    record.title = config[:title]
+    record.password = ENV.fetch("#{config[:env_prefix]}_PASSWORD") { SecureRandom.hex(12) }
+  end
+  Referral::CodeService.issue_for!(rep) if rep.active_referral_code.nil?
+end

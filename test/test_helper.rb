@@ -50,6 +50,29 @@ module ActiveSupport
     ensure
       Rails.cache = original_store
     end
+
+    # ── F10 가입 휴대폰 인증 지원 ──
+    # 기존 가입 테스트 호환용: "이미 인증을 마친 사용자" 상태를 모델 API로 재현한다.
+    # 검증 약화가 아니다 — 가입 create는 소비(consume!)를 서버에서 강제하며(REF-006),
+    # 실제 인증 플로우(발송→코드 검증)는 서비스·E2E 테스트가 실제 서비스 경유로 검증한다.
+    def verify_signup_phone!(phone_number, at: Time.current)
+      SignupVerification.create!(
+        phone_number: phone_number.to_s.gsub(/[^0-9]/, ""),
+        code_digest: BCrypt::Password.create("000000"),
+        expires_at: SignupVerification::TTL.from_now,
+        verified_at: at
+      )
+    end
+
+    # E2E용: 실제 서비스 플로우(발송→검증)를 거치되 코드가 결정적이도록 generate_code를 고정.
+    # bcrypt 해시 저장·만료·시도 제한 등 나머지 경로는 모두 실제 코드 경유.
+    def with_fixed_verification_code(code = "123456")
+      original = Signup::PhoneVerificationService.method(:generate_code)
+      Signup::PhoneVerificationService.define_singleton_method(:generate_code) { code }
+      yield code
+    ensure
+      Signup::PhoneVerificationService.define_singleton_method(:generate_code, original)
+    end
   end
 end
 

@@ -15,6 +15,11 @@ Rails.application.routes.draw do
   resource :registration, only: %i[new create]
   resource :session, only: %i[new create destroy]
 
+  # 가입 휴대폰 인증 (F10 REF-006 — JSON 응답, Stimulus fetch 경유)
+  post "registration/send_verification", to: "registrations#send_verification",
+       as: :registration_send_verification
+  post "registration/verify", to: "registrations#verify_code", as: :registration_verify
+
   # 온보딩 마법사 (2~5스텝, 1스텝은 가입)
   get "onboarding/step/:step", to: "onboarding#show", as: :onboarding_step
   patch "onboarding/step/:step", to: "onboarding#update"
@@ -109,5 +114,21 @@ Rails.application.routes.draw do
         post :refund
       end
     end
+
+    # 영업 직원 관리 (F10 — A2 확장: CRUD·정지 사유 ADM-001·수수료 지급 확정)
+    resources :sales_staffs, only: %i[index show new create edit update] do
+      member do
+        post :suspend # 정지 — 사유 필수(REF-007: 코드 무효화·로그인 차단 병행)
+        post :resume # 정지 해제 — 사유 필수
+        post :mark_paid # 수수료 지급 확정(pending → paid) — ledger_id 쿼리 파라미터·사유 필수
+      end
+    end
+  end
+
+  # 영업 직원 대시보드 (F10 — 관리자·원장과 분리된 제3 인증 체계, REF-005 스코프 격리)
+  namespace :sales do
+    root to: "dashboards#show"
+    get "dashboard", to: "dashboards#show", as: :dashboard
+    resource :session, only: %i[new create destroy]
   end
 end

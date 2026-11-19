@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_18_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_19_000001) do
   create_table "admin_users", force: :cascade do |t|
     t.string "email", null: false
     t.string "password_digest", null: false
@@ -80,6 +80,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000002) do
     t.index ["invoice_id"], name: "index_cash_receipts_on_invoice_id"
     t.index ["mgt_key"], name: "index_cash_receipts_on_mgt_key", unique: true
     t.index ["tenant_id", "state"], name: "index_cash_receipts_on_tenant_id_and_state"
+  end
+
+  create_table "commission_ledgers", force: :cascade do |t|
+    t.integer "sales_rep_id", null: false
+    t.integer "tenant_id", null: false
+    t.string "month", null: false
+    t.integer "base_amount", null: false
+    t.decimal "rate", precision: 4, scale: 4, null: false
+    t.integer "amount", null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "paid_at"
+    t.integer "source_subscription_event_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["sales_rep_id", "month"], name: "index_commission_ledgers_on_sales_rep_id_and_month"
+    t.index ["sales_rep_id"], name: "index_commission_ledgers_on_sales_rep_id"
+    t.index ["source_subscription_event_id"], name: "index_commission_ledgers_on_source_subscription_event_id"
+    t.index ["tenant_id"], name: "index_commission_ledgers_on_tenant_id"
   end
 
   create_table "guardians", force: :cascade do |t|
@@ -165,6 +183,35 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000002) do
     t.check_constraint "amount > 0", name: "chk_payments_amount_positive"
   end
 
+  create_table "referral_codes", force: :cascade do |t|
+    t.integer "sales_rep_id", null: false
+    t.string "code", null: false
+    t.datetime "expires_at", null: false
+    t.datetime "replaced_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["code"], name: "index_referral_codes_on_code", unique: true
+    t.index ["sales_rep_id", "replaced_at"], name: "index_referral_codes_on_sales_rep_id_and_replaced_at"
+    t.index ["sales_rep_id"], name: "index_referral_codes_on_sales_rep_id"
+  end
+
+  create_table "sales_reps", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "email", null: false
+    t.string "password_digest", null: false
+    t.string "role", default: "sales", null: false
+    t.string "title"
+    t.string "status", default: "active", null: false
+    t.decimal "commission_rate", precision: 4, scale: 4
+    t.integer "commission_cap_months"
+    t.text "suspended_reason"
+    t.integer "failed_attempts", default: 0, null: false
+    t.datetime "locked_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_sales_reps_on_email", unique: true
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "ip_address"
@@ -172,6 +219,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000002) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["user_id"], name: "index_sessions_on_user_id"
+  end
+
+  create_table "signup_verifications", force: :cascade do |t|
+    t.string "phone_number", null: false
+    t.string "code_digest", null: false
+    t.datetime "expires_at", null: false
+    t.integer "attempts", default: 0, null: false
+    t.datetime "verified_at"
+    t.datetime "consumed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["phone_number"], name: "index_signup_verifications_on_phone_number"
   end
 
   create_table "solid_queue_batch_executions", force: :cascade do |t|
@@ -395,6 +454,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000002) do
     t.string "email"
     t.string "barobill_member_id"
     t.datetime "barobill_joined_at"
+    t.integer "referred_by_sales_rep_id"
+    t.string "referral_code_snapshot"
+    t.datetime "first_payment_discounted_at"
+    t.index ["referred_by_sales_rep_id"], name: "index_tenants_on_referred_by_sales_rep_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -412,6 +475,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000002) do
   add_foreign_key "audit_logs", "admin_users"
   add_foreign_key "cash_receipts", "invoices"
   add_foreign_key "cash_receipts", "tenants"
+  add_foreign_key "commission_ledgers", "sales_reps"
+  add_foreign_key "commission_ledgers", "tenants"
   add_foreign_key "guardians", "students"
   add_foreign_key "invoices", "students"
   add_foreign_key "invoices", "tenants"
@@ -420,6 +485,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000002) do
   add_foreign_key "message_logs", "tenants"
   add_foreign_key "payments", "invoices"
   add_foreign_key "payments", "tenants"
+  add_foreign_key "referral_codes", "sales_reps"
   add_foreign_key "sessions", "users"
   add_foreign_key "solid_queue_batch_executions", "solid_queue_batches", column: "batch_id", on_delete: :cascade
   add_foreign_key "solid_queue_batch_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

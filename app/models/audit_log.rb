@@ -9,8 +9,10 @@ class AuditLog < ApplicationRecord
   belongs_to :admin_user, optional: true # 로그인 실패 등 계정 미확인 기록 허용
 
   # 사유가 필수인 파괴적 조치(ADM-001) — 조회성 기록(login/personal_info_viewed 등)은 제외
+  # F10: 영업 직원 정지/해제·수수료 지급 확정도 사유 필수(REF-007)
   AUDIT_ACTIONS_REQUIRING_REASON = %w[
     plan_changed trial_extended tenant_suspended tenant_resumed refund_confirmed
+    sales_rep_suspended sales_rep_resumed commission_paid
   ].freeze
 
   # A1 대시보드·A2 타임라인 표시용 최근순

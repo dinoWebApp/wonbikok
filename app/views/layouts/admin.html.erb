@@ -30,6 +30,7 @@
             { label: t("admin.nav.dashboard"), url: admin_dashboard_path, active: request.path.match?(%r{\A/admin(/\z|/dashboard\z)}), enabled: true },
             { label: t("admin.nav.tenants"), url: admin_tenants_path, active: request.path.start_with?("/admin/tenants"), enabled: true },
             { label: t("admin.nav.subscription_payments"), url: admin_subscription_payments_path, active: request.path.start_with?("/admin/subscription_payments"), enabled: true },
+            { label: t("admin.nav.sales_staffs"), url: admin_sales_staffs_path, active: request.path.start_with?("/admin/sales_staffs"), enabled: true },
             { label: t("admin.nav.messages"), url: nil, active: false, enabled: false },
             { label: t("admin.nav.cash_receipts"), url: nil, active: false, enabled: false },
             { label: t("admin.nav.batches"), url: nil, active: false, enabled: false },

@@ -5,33 +5,82 @@
   </div>
 
   <%= render layout: "shared/card", locals: { class: "p-5" } do %>
-    <%= form_with model: @user, url: registration_path, class: "space-y-5" do |form| %>
-      <%= fields model: @tenant do |tenant_form| %>
-        <%= render layout: "shared/form_field", locals: { form: tenant_form, attr: :name,
-              label_text: t("registration.tenant_name"), required: true } do %>
-          <%= tenant_form.text_field :name, class: "field-input" %>
+    <%# F10 휴대폰 인증 단계(REF-006) — 발송·검증은 fetch(JSON), 서버가 DB 원천 재검증 %>
+    <div data-controller="signup-verification"
+         data-signup-verification-send-url-value="<%= registration_send_verification_path %>"
+         data-signup-verification-verify-url-value="<%= registration_verify_path %>"
+         data-signup-verification-messages-value="<%= {
+           phone_required: t("signup_verification.errors.invalid_phone"),
+           code_required: t("signup_verification.errors.code_blank"),
+           send_failed: t("signup_verification.errors.send_failed")
+         }.to_json %>">
+      <%= form_with model: @user, url: registration_path, class: "space-y-5" do |form| %>
+        <%= fields model: @tenant do |tenant_form| %>
+          <%= render layout: "shared/form_field", locals: { form: tenant_form, attr: :name,
+                label_text: t("registration.tenant_name"), required: true } do %>
+            <%= tenant_form.text_field :name, class: "field-input" %>
+          <% end %>
         <% end %>
-      <% end %>
 
-      <%= render layout: "shared/form_field", locals: { form: form, attr: :phone_number,
-            label_text: t("registration.phone_number"), required: true } do %>
-        <%= form.text_field :phone_number, inputmode: "numeric", autocomplete: "tel",
-              class: "field-input" %>
-      <% end %>
-      <%= render layout: "shared/form_field", locals: { form: form, attr: :password,
-            label_text: t("registration.password"), required: true } do %>
-        <%= form.password_field :password, autocomplete: "new-password",
-              class: "field-input" %>
-      <% end %>
-      <%= render layout: "shared/form_field", locals: { form: form, attr: :password_confirmation,
-            label_text: t("registration.password_confirmation"), required: true } do %>
-        <%= form.password_field :password_confirmation, autocomplete: "new-password",
-              class: "field-input" %>
-      <% end %>
+        <%= render layout: "shared/form_field", locals: { form: form, attr: :phone_number,
+              label_text: t("registration.phone_number"), required: true,
+              hint: t("registration.verification.phone_hint") } do %>
+          <div class="flex gap-2">
+            <%= form.text_field :phone_number, inputmode: "numeric", autocomplete: "tel",
+                  class: "field-input", data: { signup_verification_target: "phoneInput" } %>
+            <button type="button" data-action="signup-verification#sendCode"
+                    data-signup-verification-target="sendButton"
+                    class="shrink-0 rounded-lg border border-line bg-surface px-3 text-sm font-bold text-brand-700 hover:bg-canvas">
+              <%= t("registration.verification.send") %>
+            </button>
+          </div>
+        <% end %>
 
-      <%= form.submit t("registration.submit"),
-            class: "btn-primary btn-lg w-full" %>
-    <% end %>
+        <%# 인증 상태 안내(발송·검증 결과 메시지 — Stimulus 주입) %>
+        <p class="hidden text-xs" data-signup-verification-target="statusArea" role="status"></p>
+
+        <%# 인증번호 입력 — 발송 전 숨김 %>
+        <div class="hidden space-y-2" data-signup-verification-target="codeSection">
+          <div class="flex gap-2">
+            <%= text_field_tag :signup_code, nil, inputmode: "numeric", maxlength: 6,
+                  autocomplete: "one-time-code",
+                  class: "field-input",
+                  aria: { label: t("registration.verification.code_label") },
+                  data: { signup_verification_target: "codeInput",
+                          action: "signup-verification#submitOnEnter" } %>
+            <button type="button" data-action="signup-verification#verifyCode"
+                    data-signup-verification-target="verifyButton"
+                    class="shrink-0 rounded-lg bg-brand-600 px-3 text-sm font-bold text-white hover:bg-brand-700">
+              <%= t("registration.verification.verify") %>
+            </button>
+          </div>
+        </div>
+
+        <%= render layout: "shared/form_field", locals: { form: form, attr: :password,
+              label_text: t("registration.password"), required: true } do %>
+          <%= form.password_field :password, autocomplete: "new-password",
+                class: "field-input" %>
+        <% end %>
+        <%= render layout: "shared/form_field", locals: { form: form, attr: :password_confirmation,
+              label_text: t("registration.password_confirmation"), required: true } do %>
+          <%= form.password_field :password_confirmation, autocomplete: "new-password",
+                class: "field-input" %>
+        <% end %>
+
+        <%# F10 추천 코드(선택) — 유효 코드만 수용(REF-001), 유효 시 첫 결제 20% 할인(REF-002) %>
+        <div>
+          <div class="mb-1.5 flex items-baseline justify-between gap-2">
+            <%= label_tag :referral_code, t("registration.referral_code"), class: "text-sm font-semibold text-ink" %>
+          </div>
+          <%= text_field_tag :referral_code, params[:referral_code],
+                autocapitalize: "characters", class: "field-input uppercase" %>
+          <p class="mt-1.5 text-xs leading-relaxed text-muted"><%= t("registration.referral_code_hint") %></p>
+        </div>
+
+        <%= form.submit t("registration.submit"),
+              class: "btn-primary btn-lg w-full" %>
+      <% end %>
+    </div>
   <% end %>
 
   <p class="mt-6 text-center text-sm text-muted">

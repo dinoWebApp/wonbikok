@@ -1,0 +1,23 @@
+<div class="mx-auto w-full max-w-sm pt-6 md:pt-14">
+  <div class="mb-6">
+    <h1 class="text-2xl font-extrabold tracking-tight text-ink"><%= t("sales.sessions.title") %></h1>
+    <p class="mt-1 text-sm leading-relaxed text-muted"><%= t("sales.sessions.description") %></p>
+  </div>
+
+  <%= render layout: "shared/card", locals: { class: "p-5" } do %>
+    <%# B-1: scope 지정 필수 — 컨트롤러 params.expect(sales_session:)과 필드 이름 계약 유지 %>
+    <%= form_with scope: :sales_session, url: sales_session_path, method: :post,
+          class: "space-y-5" do |form| %>
+      <div>
+        <%= form.label :email, t("sales.sessions.email"), class: "mb-1.5 block text-sm font-semibold text-ink" %>
+        <%= form.email_field :email, autocomplete: "email", required: true, class: "field-input" %>
+      </div>
+      <div>
+        <%= form.label :password, t("sales.sessions.password"), class: "mb-1.5 block text-sm font-semibold text-ink" %>
+        <%= form.password_field :password, autocomplete: "current-password", required: true, class: "field-input" %>
+      </div>
+      <p class="text-xs leading-relaxed text-muted"><%= t("sales.sessions.lock_hint") %></p>
+      <%= form.submit t("sales.sessions.sign_in"), class: "btn-primary btn-lg w-full" %>
+    <% end %>
+  <% end %>
+</div>

@@ -1,0 +1,63 @@
+<%# 영업 직원 신규·수정 공용 폼 — @sales_staff.persisted?로 분기. role 선택은 고정 2종(REF-003 정책). %>
+<h1 class="text-xl font-extrabold tracking-tight">
+  <%= @sales_staff.persisted? ? t("admin.sales_staffs.edit.title") : t("admin.sales_staffs.new.title") %>
+</h1>
+
+<%= render layout: "shared/card", locals: { class: "mt-4 max-w-xl p-5" } do %>
+  <%= form_with model: @sales_staff, url: @sales_staff.persisted? ? admin_sales_staff_path(@sales_staff) : admin_sales_staffs_path,
+        class: "space-y-5" do |form| %>
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :name,
+          label_text: t("admin.sales_staffs.form.name"), required: true } do %>
+      <%= form.text_field :name, class: "field-input" %>
+    <% end %>
+
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :email,
+          label_text: t("admin.sales_staffs.form.email"), required: true,
+          hint: t("admin.sales_staffs.form.email_hint") } do %>
+      <%= form.email_field :email, autocomplete: "email", class: "field-input" %>
+    <% end %>
+
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :password,
+          label_text: t("admin.sales_staffs.form.password"), required: !@sales_staff.persisted?,
+          hint: @sales_staff.persisted? ? t("admin.sales_staffs.form.password_keep_hint") : t("admin.sales_staffs.form.password_hint") } do %>
+      <%= form.password_field :password, autocomplete: "new-password", class: "field-input" %>
+    <% end %>
+
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :password_confirmation,
+          label_text: t("admin.sales_staffs.form.password_confirmation"), required: !@sales_staff.persisted? } do %>
+      <%= form.password_field :password_confirmation, autocomplete: "new-password", class: "field-input" %>
+    <% end %>
+
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :role,
+          label_text: t("admin.sales_staffs.form.role"), required: true,
+          hint: t("admin.sales_staffs.form.role_hint") } do %>
+      <%= form.select :role, SalesRep::ROLES.map { |r| [t("admin.sales_staffs.roles.#{r}"), r] },
+            {}, class: "field-input" %>
+    <% end %>
+
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :title,
+          label_text: t("admin.sales_staffs.form.title"),
+          hint: t("admin.sales_staffs.form.title_hint") } do %>
+      <%= form.text_field :title, class: "field-input" %>
+    <% end %>
+
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :commission_rate,
+          label_text: t("admin.sales_staffs.form.commission_rate"),
+          hint: t("admin.sales_staffs.form.rate_hint") } do %>
+      <%= form.number_field :commission_rate, step: "0.01", min: "0.05", max: "0.30",
+            placeholder: t("admin.sales_staffs.form.rate_placeholder"), class: "field-input" %>
+    <% end %>
+
+    <%= render layout: "shared/form_field", locals: { form: form, attr: :commission_cap_months,
+          label_text: t("admin.sales_staffs.form.commission_cap_months"),
+          hint: t("admin.sales_staffs.form.cap_hint") } do %>
+      <%= form.number_field :commission_cap_months, min: "0", step: 1,
+            placeholder: t("admin.sales_staffs.form.cap_placeholder"), class: "field-input" %>
+    <% end %>
+
+    <div class="flex gap-2">
+      <%= render "shared/button", label: t("common.save"), form: form, variant: :primary, class: "flex-1" %>
+      <%= render "shared/button", label: t("common.cancel"), url: admin_sales_staffs_path, variant: :secondary %>
+    </div>
+  <% end %>
+<% end %>

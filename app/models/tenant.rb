@@ -20,6 +20,11 @@ class Tenant < ApplicationRecord
   # 구독(W4 F8) — Tenant 1:1(tenant_id 유니크). 생성은 Subscriptions::TrialService 경유만.
   has_one :subscription, dependent: :destroy
 
+  # 추천 시스템(F10) — 가입 시점 추천 코드로 매핑된 영업 직원(REF-001 스냅샷: 코드 로테이션 무영향).
+  # optional — 추천 없는 가입이 기본 경로.
+  belongs_to :referred_by_sales_rep, class_name: "SalesRep", optional: true,
+                                     inverse_of: :referred_tenants
+
   # 리마인더 설정(F6) — 문구 톤 3종(부드러움/표준/공식), 단계별 토글, 발송 시각
   REMINDER_TONES = %w[soft standard formal].freeze
   REMINDER_STAGES = %i[d3 d7 month_end].freeze
@@ -52,6 +57,11 @@ class Tenant < ApplicationRecord
 
   # 온보딩 마법사: 1=가입, 2=사업자 정보, 3=납부 계좌, 4=연동 안내, 5=연습 모드, 6=완료
   ONBOARDING_FINAL_STEP = 6
+
+  # F10: 추천 가입 테넌트 — 첫 결제 할인(REF-002)·수수료 집계(REF-003)의 대상 판정.
+  def referred?
+    referred_by_sales_rep_id.present?
+  end
 
   def onboarding_complete?
     onboarding_step >= ONBOARDING_FINAL_STEP
