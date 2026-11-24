@@ -135,7 +135,7 @@ bin/kamal deploy          # 프로덕션 배포 (git-deploy 스킬 절차 경유
 
 **배포:** "git 배포", "커밋", "푸시", "배포", "push", "kamal 배포" 요청 시 `$wonbikok-git-deploy` 스킬을 사용하라.
 
-**하네스 구성 요소:** 명령어는 `.zcode/commands/`(일반·절약·병렬 2종 합계 4개), 워크플로우·참조 스킬은 `.zcode/skills/`, 서브에이전트 프로필 6개(일반+lite)는 `.zcode/agents/`, 진행 상태는 `.zcode/progress.json`, 산출물은 `_workspace/`. 구성 규약은 HARNESS_CONVENTION.md (v4.2.0, ZCode Desktop 기준).
+**하네스 구성 요소:** 명령어는 `.zcode/commands/`(일반·절약·병렬 2종 합계 4개), 워크플로우·참조 스킬은 `.zcode/skills/`, 서브에이전트 프로필 6개(일반+lite)는 `.zcode/agents/`, 진행 상태는 `.zcode/progress.json`, 산출물은 `_workspace/`. 구성 규약은 HARNESS_CONVENTION.md (v4.2.1, ZCode Desktop 기준).
 
 **변경 이력:**
 
@@ -145,6 +145,7 @@ bin/kamal deploy          # 프로덕션 배포 (git-deploy 스킬 절차 경유
 | 2026-10-29 | omp→ZCode 하네스 전환 | 전체 | ZCode Desktop 런타임 이전 (HARNESS_CONVENTION v4.0.3 기준) |
 | 2026-11-04 | §6.14 병렬 배치 확장 채택 — 명령어 4종·오케스트레이터 스킬 병렬 절·병렬 후보 힌트 | 전체 | HARNESS_CONVENTION v4.1.1 동기화 |
 | 2026-11-13 | §6.13 승인 게이트 `AskUserQuestion` 선택 질의 방식 전환(텍스트 폴백 유지) — 명령어 4종·오케스트레이터 스킬(하드 룰 1·✋ 게이트·병렬 승인)·AGENTS.md | 전체 | HARNESS_CONVENTION v4.2.0 동기화 |
+| 2026-11-24 | 일반 모드 Reviewer 모델 GLM-5.3 → GLM-5.4 상향 — `wonbikok-reviewer` frontmatter `model`만 변경(§1.4·§9.2) | wonbikok-reviewer | HARNESS_CONVENTION v4.2.1 동기화 |
 
 ## 구현 진행 상황 (로드맵)
 
