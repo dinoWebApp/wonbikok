@@ -32,7 +32,7 @@ Rails 단일 앱 (Puma)
 
 ## 기술 스택
 
-- **Ruby 4.0.7** (mise/.ruby-version 고정), **Rails 8.1.4**
+- **Ruby 4.0.10** (mise/.ruby-version 고정), **Rails 8.1.4**
 - DB: SQLite3 (>= 2.1) — 개발/운영 동일, db/schema.rb 커밋 필수
 - 인증: bcrypt(has_secure_password) + Rails 8 세션 — 원장 식별자는 휴대폰번호(Active Record Encryption 암호화)
 - 웹서버 Puma + Thruster, 배포 Kamal 2 (config/deploy.yml)
